@@ -3,7 +3,7 @@
 // calibration of this site.
 
 import { SITE_LINKS } from "../sites/registry.js";
-import { switchMenuHtml } from "../ui/index.js";
+import { setHtml, switchMenuHtml } from "../ui/index.js";
 
 /**
  * @param {{ document: Document, window: Window, menu: HTMLElement, button: HTMLElement, group: object,
@@ -16,7 +16,7 @@ export function createSiteMenu({ document, window, menu, button, group, provider
   group.add({ close });
 
   function fill() {
-    menu.innerHTML = switchMenuHtml(SITE_LINKS, provider.displayName);
+    setHtml(menu, switchMenuHtml(SITE_LINKS, provider.displayName));
     menu.querySelectorAll("button.zs-site-opt[data-u], .zs-tip-opt[data-u]").forEach((link) => link.addEventListener("click", () => {
       try { window.open(link.dataset.u, "_blank", "noopener"); } catch { /* popups blocked */ }
       close();

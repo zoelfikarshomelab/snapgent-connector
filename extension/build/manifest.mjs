@@ -7,7 +7,9 @@ const needsCookies = (sites) => (sites.some((site) => site.accounts) ? ["cookies
 
 export const TARGETS = ["chrome", "firefox"];
 const GECKO_ID = "snapgent@herdodp.github.io";
-const FIREFOX_MIN_VERSION = "128.0"; // first release with MV3 `world: "MAIN"` content scripts
+// Firefox 140 (Android 142) is the first release that knows `data_collection_permissions`, which addons.mozilla.org asks for.
+const FIREFOX_MIN_VERSION = "140.0";
+const FIREFOX_ANDROID_MIN_VERSION = "142.0";
 
 // One content script for every site: it is calibrated from a stored profile or says "not calibrated" (docs/CALIBRATION.md).
 export function contentScripts(sites = SITES) {
@@ -39,7 +41,11 @@ export function buildManifest(base, { target, version }) {
   if (target === "firefox") {
     // Firefox MV3 has no service workers; it runs the background as an event page.
     manifest.background = { scripts: ["background.js"] };
-    manifest.browser_specific_settings = { gecko: { id: GECKO_ID, strict_min_version: FIREFOX_MIN_VERSION } };
+    // The extension only talks to the bridge on 127.0.0.1 and collects nothing, hence "none".
+    manifest.browser_specific_settings = {
+      gecko: { id: GECKO_ID, strict_min_version: FIREFOX_MIN_VERSION, data_collection_permissions: { required: ["none"] } },
+      gecko_android: { strict_min_version: FIREFOX_ANDROID_MIN_VERSION },
+    };
   } else {
     manifest.background = { service_worker: "background.js" };
   }

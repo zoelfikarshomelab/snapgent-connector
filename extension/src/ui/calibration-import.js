@@ -2,7 +2,7 @@
 // "Import calibrations" popup: what the chosen files hold, one row per AI of the "switch AI" list, each with its own tick, so only some of
 // them can be taken. A row says when the AI is already calibrated and the import would replace that.
 
-import { escapeHtml as esc } from "./html.js";
+import { escapeHtml as esc, setHtml } from "./html.js";
 import { closeButton, mountPopup } from "./popup.js";
 
 function row(group) {
@@ -17,13 +17,13 @@ function row(group) {
  */
 export function openCalibrationImport({ document, groups, skipped = [], onImport }) {
   const { pop, close } = mountPopup(document);
-  pop.innerHTML =
+  setHtml(pop,
     `<div class="zs-mcp-pop-card" role="dialog" aria-label="Import calibrations">` +
       `<div class="zs-mcp-pop-head"><span>Import calibrations</span>${closeButton}</div>` +
       `<div class="zs-mcp-pop-note">Untick the AIs you do not want. An AI you already calibrated is replaced.${skipped.length ? ` Left out: ${esc(skipped.join("; "))}.` : ""}</div>` +
       `<div class="zs-mcp-pop-list">${groups.map(row).join("") || `<div class="zs-mcp-pop-note">Nothing usable in those files.</div>`}</div>` +
       `<div class="zs-cal-import-foot"><button type="button" class="zs-cal-import-go"${groups.length ? "" : " disabled"}>Import</button></div>` +
-    `</div>`;
+    `</div>`);
   pop.querySelector(".zs-mcp-pop-close").addEventListener("click", close);
   pop.querySelector(".zs-cal-import-go").addEventListener("click", () => {
     onImport([...pop.querySelectorAll(".zs-mcp-check")].filter((box) => box.checked).map((box) => box.dataset.id));

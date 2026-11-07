@@ -5,6 +5,7 @@
 // Pure drawing: the tabs' data comes in, clicks and typed text go out through the callbacks.
 
 import { lineHtml } from "./ansi.js";
+import { appendHtml, setHtml } from "./html.js";
 
 const MAX_BODY_LINES = 2000; // per tab; the oldest are dropped
 const DEFAULT_HINT = "Ctrl+Enter runs the command · Copy gives what the AI would receive";
@@ -41,7 +42,7 @@ const TEMPLATE = `
  */
 export function createTerminalPanel({ document, onStop = () => {}, onCopy = () => {}, onRun = () => ({ ok: true }), onExamples = () => {} }) {
   const root = document.createElement("div");
-  root.innerHTML = TEMPLATE;
+  setHtml(root, TEMPLATE);
   const panel = root.firstElementChild;
   document.documentElement.appendChild(panel);
   const tabsEl = panel.querySelector(".zs-t-tabs");
@@ -128,11 +129,11 @@ export function createTerminalPanel({ document, onStop = () => {}, onCopy = () =
 
   /** One pill in the tab row. */
   function setTabs(tabs) {
-    tabsEl.innerHTML = tabs.map((tab) => {
+    setHtml(tabsEl, tabs.map((tab) => {
       const marker = tab.status === "running" ? "●" : tab.status === "success" ? "✓" : tab.status === "stopped" ? "⏹" : "✕";
       return `<button type="button" class="zs-t-tab zs-t-${tab.status}${tab.key === selected ? " zs-t-sel" : ""}" data-key="${escapeHtml(tab.key)}" role="tab">` +
         `<span class="zs-t-dot">${marker}</span><span class="zs-t-name">${escapeHtml(tab.name)}</span></button>`;
-    }).join("") || '<span class="zs-t-empty">No command has run yet.</span>';
+    }).join("") || '<span class="zs-t-empty">No command has run yet.</span>');
     for (const el of tabsEl.querySelectorAll(".zs-t-tab")) {
       el.addEventListener("click", () => select(el.dataset.key));
     }
@@ -177,7 +178,7 @@ export function createTerminalPanel({ document, onStop = () => {}, onCopy = () =
   function appendLine(key, segments) {
     const tab = body(key);
     tab.count += 1;
-    tab.el.insertAdjacentHTML("beforeend", lineHtml(segments));
+    appendHtml(tab.el, lineHtml(segments));
     // Drop the oldest, one line at a time, so a spewing command stays bounded.
     if (tab.count > MAX_BODY_LINES && tab.el.firstElementChild) {
       tab.el.firstElementChild.remove();

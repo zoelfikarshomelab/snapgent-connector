@@ -6,6 +6,7 @@
 import { TUTORIAL_LANGUAGES } from "../domain/tutorial/language.js";
 import { TUTORIAL_MAX_SIZE, TUTORIAL_MIN_SIZE, clampTutorialSize } from "../domain/tutorial/size.js";
 import { parseInline, parseTutorial } from "../domain/tutorial/parse.js";
+import { setHtml } from "./html.js";
 import { closeButton, mountPopup } from "./popup.js";
 
 function inline(doc, parent, text) {
@@ -79,7 +80,7 @@ export function openTutorial({ document, texts, images = {}, lang, onLang = () =
   // The size buttons sit beside the language switch; the card is wider than the other settings cards so the tutorial's pictures fit.
   const sizeButtons = '<button type="button" class="zs-mcp-pop-btn zs-mcp-pop-btn-small" data-size="-1" aria-label="Smaller text">A-</button>'
     + '<button type="button" class="zs-mcp-pop-btn zs-mcp-pop-btn-small" data-size="1" aria-label="Bigger text">A+</button>';
-  pop.innerHTML = `<div class="zs-mcp-pop-card zs-tut-card" role="dialog" aria-label="Tutorial"><div class="zs-mcp-pop-head"><span>Tutorial</span><span class="zs-tut-size">${sizeButtons}</span><span class="zs-tut-lang">${buttons}</span>${closeButton}</div><div class="zs-mcp-pop-body zs-tut"></div></div>`;
+  setHtml(pop, `<div class="zs-mcp-pop-card zs-tut-card" role="dialog" aria-label="Tutorial"><div class="zs-mcp-pop-head"><span>Tutorial</span><span class="zs-tut-size">${sizeButtons}</span><span class="zs-tut-lang">${buttons}</span>${closeButton}</div><div class="zs-mcp-pop-body zs-tut"></div></div>`);
   pop.querySelector(".zs-mcp-pop-close").addEventListener("click", close);
   const body = pop.querySelector(".zs-tut");
   let current = TUTORIAL_LANGUAGES.includes(lang) ? lang : TUTORIAL_LANGUAGES[0];

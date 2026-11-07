@@ -5,7 +5,7 @@
 import { MAX_BATCH_CALLS, MAX_PROMPT_CHARS, MIN_BATCH_CALLS, MIN_PROMPT_CHARS } from "../domain/prompt/budget.js";
 import { DEFAULT_CONTEXT_FILES } from "../domain/prompt/context-file.js";
 import { parseFolderNames } from "../domain/prompt/excluded-folders.js";
-import { escapeHtml as esc } from "./html.js";
+import { escapeHtml as esc, setHtml } from "./html.js";
 import { closeButton, mountPopup } from "./popup.js";
 
 const CHARS_STEP = 10000;
@@ -56,7 +56,7 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
       row("zs-cal-export-all", "Export all calibrations", "one file, kept apart per AI") +
       row("zs-cal-import-all", "Import calibrations…", "choose which AIs to take from the files") + `</section>`
     : "";
-  pop.innerHTML =
+  setHtml(pop,
     `<div class="zs-mcp-pop-card zs-pref-card" role="dialog" aria-label="Preferences"><div class="zs-mcp-pop-head"><span>Preferences</span>${closeButton}</div>` +
     `<div class="zs-mcp-pop-body">` +
     slider("zs-pref-chars", "Message size", MIN_PROMPT_CHARS, MAX_PROMPT_CHARS, CHARS_STEP,
@@ -91,7 +91,7 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
     `<div class="zs-mcp-pop-note">One file name per line. The first one found in the workspace is sent to the AI as project instructions when a session starts (usually <code>AGENTS.md</code>).</div></div>` +
     barSection + siteSection +
     `</div>` +
-    `<div class="zs-mcp-pop-foot"><button id="zs-pref-reset" class="zs-mcp-pop-btn zs-mcp-pop-btn-block">Restore the defaults</button></div></div>`;
+    `<div class="zs-mcp-pop-foot"><button id="zs-pref-reset" class="zs-mcp-pop-btn zs-mcp-pop-btn-block">Restore the defaults</button></div></div>`);
   pop.querySelector(".zs-mcp-pop-close").addEventListener("click", close);
 
   const bind = (id, value, show, store) => {

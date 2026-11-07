@@ -2,7 +2,7 @@
 // "MCP servers" popup: which servers are switched on. Only enabled servers appear in the target
 // dropdown and are visible to the AI.
 
-import { escapeHtml as esc } from "./html.js";
+import { escapeHtml as esc, setHtml } from "./html.js";
 import { closeButton, mountPopup } from "./popup.js";
 
 function row(option, enabled) {
@@ -20,12 +20,12 @@ function row(option, enabled) {
  */
 export function openMcpSettings({ document, options, isEnabled, setEnabled, onToggle = () => {}, onClose = () => {} }) {
   const { pop, close } = mountPopup(document, { onClose });
-  pop.innerHTML =
+  setHtml(pop,
     `<div class="zs-mcp-pop-card" role="dialog" aria-label="MCP settings">` +
       `<div class="zs-mcp-pop-head"><span>MCP servers</span>${closeButton}</div>` +
       `<div class="zs-mcp-pop-note">Only enabled servers appear in the dropdown and are read by the AI. Disabled servers cost no tokens.</div>` +
       `<div class="zs-mcp-pop-list">${options.map((option) => row(option, isEnabled(option.id))).join("")}</div>` +
-    `</div>`;
+    `</div>`);
   pop.querySelector(".zs-mcp-pop-close").addEventListener("click", close);
   pop.querySelectorAll(".zs-mcp-check").forEach((box) =>
     box.addEventListener("change", () => {

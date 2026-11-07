@@ -2,6 +2,8 @@
 // Asks the user to pick one of a few folders. Built like the approval dialog (confirm-dialog.js): a modal <dialog> in a CLOSED shadow
 // root on a page we do not control, only real clicks count, Esc/backdrop mean "none", and the folder paths go in as text.
 
+import { setHtml } from "./html.js";
+
 const STYLE = `
   :host { all: initial; --bg: #ffffff; --fg: #17181c; --muted: #5c6070; --line: #d6d8e0; --ok: #1a6bd1; }
   @media (prefers-color-scheme: dark) { :host { --bg: #1b1d24; --fg: #eceef4; --muted: #a2a7b8; --line: #343846; --ok: #7ab4ff; } }
@@ -30,8 +32,8 @@ export function createChoiceDialog({ document: doc = globalThis.document, shadow
     return new Promise((resolve) => {
       const host = doc.createElement("div");
       const shadow = host.attachShadow({ mode: shadowMode });
-      shadow.innerHTML = `<style>${STYLE}</style><dialog aria-labelledby="t"><div class="body"><p class="eyebrow">snapgentV3</p><h2 id="t"></h2><p class="hint"></p></div>
-        <div class="opts"></div><div class="actions"><button class="cancel" type="button">Cancel</button></div></dialog>`;
+      setHtml(shadow, `<style>${STYLE}</style><dialog aria-labelledby="t"><div class="body"><p class="eyebrow">snapgentV3</p><h2 id="t"></h2><p class="hint"></p></div>
+        <div class="opts"></div><div class="actions"><button class="cancel" type="button">Cancel</button></div></dialog>`);
       const dialog = shadow.querySelector("dialog");
       shadow.querySelector("h2").textContent = title;
       shadow.querySelector(".hint").textContent = hint || "";
@@ -47,7 +49,7 @@ export function createChoiceDialog({ document: doc = globalThis.document, shadow
         const button = doc.createElement("button");
         button.type = "button";
         button.className = "opt";
-        button.innerHTML = '<span class="name"></span><span class="path"></span>';
+        setHtml(button, '<span class="name"></span><span class="path"></span>');
         button.querySelector(".name").textContent = folderName(path);
         button.querySelector(".path").textContent = path;
         button.addEventListener("click", (event) => { if (isTrusted(event)) finish(path); });

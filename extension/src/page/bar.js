@@ -6,7 +6,7 @@
 
 import {
   computeBarView, createBarPlacer, createInputCover, createNotifications, createSetupCard, pillHtml, shouldShowSetup, applyTheme,
-  computeMenuPlacement, applyMenuPlacement, viewportOf,
+  computeMenuPlacement, applyMenuPlacement, viewportOf, setHtml,
 } from "../ui/index.js";
 import { controlFace } from "../domain/agent/agent-mode.js";
 import { isWorkspaceServer } from "../domain/agent/session-start.js";
@@ -58,7 +58,7 @@ export function createBar({ document, window, provider, state, settings, serverD
   const root = document.createElement("div");
   root.id = "zs-root";
   const notifications = createNotifications({ root });
-  root.innerHTML = TEMPLATE;
+  setHtml(root, TEMPLATE);
   document.documentElement.appendChild(root);
   const $ = (selector) => root.querySelector(selector);
   const el = { bar: $("#zs-bar"), state: $("#zs-state"), action: $("#zs-action"), stop: $("#zs-stop"), play: $("#zs-play"), discuss: $("#zs-discuss"), stopFloat: $("#zs-stop-float"), toggle: $("#zs-toggle"), menu: $("#zs-menu") };
@@ -138,7 +138,7 @@ export function createBar({ document, window, provider, state, settings, serverD
     lastSignature = signature;
     el.bar.classList.remove("tone-standby", "tone-active", "tone-warn", "tone-noagent", "tone-starting");
     el.bar.classList.add(`tone-${view.tone}`);
-    el.state.innerHTML = `${view.spinner ? `<span class="zs-spin"></span>` : ""}<span class="zs-state-txt">${view.message}</span>`;
+    setHtml(el.state, `${view.spinner ? `<span class="zs-spin"></span>` : ""}<span class="zs-state-txt">${view.message}</span>`);
     el.state.classList.toggle("zs-state-warn", view.warn);
     el.action.textContent = view.label;
     el.action.dataset.kind = view.kind;

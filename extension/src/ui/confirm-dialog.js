@@ -7,6 +7,8 @@
 //    for a moment so a click meant for something else cannot land on it;
 //  - the action text goes in as textContent, never as HTML.
 
+import { setHtml } from "./html.js";
+
 const RISK_LABELS = {
   destructive: "Deletes data",
   execute: "Runs a program",
@@ -55,7 +57,7 @@ export function createConfirmDialog({
     return new Promise((resolve) => {
       const host = doc.createElement("div");
       const shadow = host.attachShadow({ mode: shadowMode });
-      shadow.innerHTML = `<style>${STYLE}</style><dialog aria-labelledby="t">
+      setHtml(shadow, `<style>${STYLE}</style><dialog aria-labelledby="t">
         <div class="body">
           <p class="eyebrow">snapgentV3</p>
           <span class="risk"></span>
@@ -64,7 +66,7 @@ export function createConfirmDialog({
           <p class="hint">Nothing happens unless you allow it. Closing this window counts as "Deny".</p>
         </div>
         <div class="actions"><button class="deny" type="button" autofocus>Deny</button><button class="allow" type="button" disabled>Allow</button></div>
-      </dialog>`;
+      </dialog>`);
       const dialog = shadow.querySelector("dialog");
       const riskLabel = shadow.querySelector(".risk");
       riskLabel.textContent = RISK_LABELS[risk] || "Needs your approval";

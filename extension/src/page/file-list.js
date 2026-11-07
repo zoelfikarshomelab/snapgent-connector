@@ -4,7 +4,7 @@
 // by the caller; without it one row is highlighted (`move`, `activePath`) and a click picks it.
 
 import { buildFileTree } from "../domain/prompt/file-tags.js";
-import { fileRowsHtml } from "../ui/index.js";
+import { escapeHtml, fileRowsHtml, setHtml } from "../ui/index.js";
 
 /**
  * @param {{ element: HTMLElement, chosen?: Set<string>, max?: number, onPick: (path: string) => void }} options
@@ -35,7 +35,7 @@ export function createFileList({ element, chosen = null, max = 200, onPick }) {
     if (!activePath || !visiblePaths.includes(activePath)) {
       activePath = visiblePaths[0] || null;
     }
-    element.innerHTML = fileRowsHtml(tree, { chosen, activePath, max });
+    setHtml(element, fileRowsHtml(tree, { chosen, activePath, max }));
     const row = element.querySelector(".zs-file-active");
     if (row && row.scrollIntoView) row.scrollIntoView({ block: "nearest" });
   }
@@ -91,6 +91,6 @@ export function createFileList({ element, chosen = null, max = 200, onPick }) {
     },
     activePath: () => (chosen ? null : activePath),
     count: () => visiblePaths.length,
-    message(text) { element.innerHTML = `<div class="zs-files-more">${text}</div>`; },
+    message(text) { setHtml(element, `<div class="zs-files-more">${escapeHtml(text)}</div>`); },
   };
 }

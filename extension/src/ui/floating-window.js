@@ -2,6 +2,8 @@
 // A floating window that can be moved (the handle in its corner) and resized (the grip), the terminal's panel made reusable.
 // Pure drawing: the body is the caller's, the frame, the moving and the resizing are here.
 
+import { setHtml } from "./html.js";
+
 const TEMPLATE =
   '<div class="zs-fw-head"><span class="zs-fw-title"></span>' +
   '<button class="zs-fw-close" type="button" aria-label="Close">&#10005;</button></div>' +
@@ -22,7 +24,7 @@ export function createFloatingWindow({ document, title = "", className = "", wid
   const root = document.createElement("div");
   root.className = `zs-float-win ${className}`.trim();
   root.hidden = true;
-  root.innerHTML = TEMPLATE;
+  setHtml(root, TEMPLATE);
   root.querySelector(".zs-fw-title").textContent = title;
   document.documentElement.appendChild(root);
   const body = root.querySelector(".zs-fw-body");

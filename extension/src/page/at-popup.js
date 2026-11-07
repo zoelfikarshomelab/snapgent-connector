@@ -6,7 +6,7 @@
 // Only the tag at the END of the text is looked at: the caret position inside a site's editor cannot be read reliably.
 
 import { matchPaths, trailingTag } from "../domain/prompt/file-tags.js";
-import { applyMenuPlacement, atPopupHtml, computeMenuPlacement, openPreferences, viewportOf } from "../ui/index.js";
+import { applyMenuPlacement, atPopupHtml, computeMenuPlacement, openPreferences, setHtml, viewportOf } from "../ui/index.js";
 import { createFileList } from "./file-list.js";
 
 const SHOWN = 60;
@@ -17,7 +17,7 @@ export function createAtPopup({ document, window, root, state, settings, provide
   const el = document.createElement("div");
   el.id = "zs-at-popup";
   el.hidden = true;
-  el.innerHTML = atPopupHtml();
+  setHtml(el, atPopupHtml());
   root.appendChild(el);
   const list = createFileList({ element: el.querySelector(".zs-at-list"), max: SHOWN, onPick: (path) => pick(path) });
 

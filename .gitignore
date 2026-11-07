@@ -34,3 +34,6 @@ trusted_origins.json
 
 # local tool link, not part of the project
 /supertool
+
+.snapgent/plans
+.claude

@@ -4,7 +4,7 @@
 // at the bottom, with a way to fetch the list again and a gear that opens the Preferences.
 
 import { matchPaths } from "../domain/prompt/file-tags.js";
-import { createFloatingWindow, filesMenuHtml } from "../ui/index.js";
+import { createFloatingWindow, filesMenuHtml, setHtml } from "../ui/index.js";
 import { createFileList } from "./file-list.js";
 import { MAX_TAGGED } from "./attachments.js";
 
@@ -13,7 +13,7 @@ import { MAX_TAGGED } from "./attachments.js";
 export function createFilesMenu({ document, root, group, state, settings, files, preferences, toast, openPreferences }) {
   const button = root.querySelector("#zs-files-btn");
   const win = createFloatingWindow({ document, title: "Files", className: "zs-files-win", width: 760 });
-  win.body.innerHTML = filesMenuHtml();
+  setHtml(win.body, filesMenuHtml());
   group.add({ close: () => win.close() });
 
   const $ = (selector) => win.body.querySelector(selector);

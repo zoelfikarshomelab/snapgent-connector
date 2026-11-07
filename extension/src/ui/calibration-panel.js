@@ -2,6 +2,8 @@
 // The calibration dialog's panel and highlight: one closed shadow root of their own, so the page can neither see nor
 // alter them. It only draws what it is told; the wizard decides what to say.
 
+import { setHtml } from "./html.js";
+
 const STYLE = `
 :host { all: initial; }
 .card { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); width: min(480px, calc(100vw - 32px)); box-sizing: border-box;
@@ -36,7 +38,7 @@ export function createPanel({ document, shadowMode, trusted, onAction }) {
     host = document.createElement("div");
     host.id = "zs-calibrate";
     shadow = host.attachShadow({ mode: shadowMode });
-    shadow.innerHTML = `<style>${STYLE}</style><div class="card"><div class="head"><b></b><span class="step"></span></div><p class="text"></p><p class="hint"></p><pre hidden></pre><p class="error" hidden></p><div class="buttons"></div></div><div class="outline" hidden></div>`;
+    setHtml(shadow, `<style>${STYLE}</style><div class="card"><div class="head"><b></b><span class="step"></span></div><p class="text"></p><p class="hint"></p><pre hidden></pre><p class="error" hidden></p><div class="buttons"></div></div><div class="outline" hidden></div>`);
     (document.documentElement || document.body).appendChild(host);
   }
   const q = (selector) => shadow.querySelector(selector);
@@ -95,7 +97,7 @@ export function createPanel({ document, shadowMode, trusted, onAction }) {
     unmark(name);
     const box = document.createElement("div");
     box.className = `mark ${kind}`;
-    box.innerHTML = "<span></span>";
+    setHtml(box, "<span></span>");
     box.firstChild.textContent = label;
     shadow.appendChild(box);
     marks.set(name, { el, box });

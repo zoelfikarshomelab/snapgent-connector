@@ -5,6 +5,7 @@
 
 import { boxOf, computeCoverRect, measureClippingAncestors } from "./cover-geometry.js";
 import { opaqueBg } from "./cover-color.js";
+import { setHtml } from "./html.js";
 
 /**
  * @param {{ document: Document, provider: object }} deps  the window comes from `document.defaultView`
@@ -39,7 +40,7 @@ export function createInputCover({ document, provider }) {
     if (!cover) {
       cover = document.createElement("div");
       cover.id = "zs-input-cover";
-      cover.innerHTML = "<span></span>";
+      setHtml(cover, "<span></span>");
       cover.firstChild.textContent = label;
       cover.firstChild.title = label;
       document.documentElement.appendChild(cover);

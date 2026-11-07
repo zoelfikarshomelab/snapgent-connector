@@ -3,7 +3,7 @@
 // Auto) and the workspace folder (VS Code's active window, one of its open folders, or any folder).
 
 import { isWorkspaceServer } from "../domain/agent/session-start.js";
-import { APPROVAL_MODES, modeMenuHtml, targetMenuHtml, workspaceLabel, workspaceMenuHtml } from "../ui/index.js";
+import { APPROVAL_MODES, modeMenuHtml, setHtml, targetMenuHtml, workspaceLabel, workspaceMenuHtml } from "../ui/index.js";
 import { createPillMenu } from "./pill-menu.js";
 
 /**
@@ -22,7 +22,7 @@ export function createBarMenus({ document, root, group, settings, serverDirector
     const key = `${settings.target()}|${options.map((option) => `${option.id}:${option.name}`).join("|")}`;
     if (menu.dataset.key === key && menu.childElementCount) return; // rewriting would destroy a button between mouse-down and mouse-up
     menu.dataset.key = key;
-    menu.innerHTML = targetMenuHtml(options, settings.target());
+    setHtml(menu, targetMenuHtml(options, settings.target()));
     menu.querySelectorAll(".zs-target-opt").forEach((button) => button.addEventListener("click", () => {
       targetMenu.close();
       if (button.dataset.id !== settings.target()) settings.selectTarget(button.dataset.id);
@@ -32,7 +32,7 @@ export function createBarMenus({ document, root, group, settings, serverDirector
   // ── how risky actions are approved ──
   const modeMenu = make("#zs-mode-btn", "#zs-mode-menu", 280, "right", 200, () => {
     const menu = $("#zs-mode-menu");
-    menu.innerHTML = modeMenuHtml(settings.approvalMode());
+    setHtml(menu, modeMenuHtml(settings.approvalMode()));
     menu.querySelectorAll(".zs-mode-opt").forEach((button) => button.addEventListener("click", () => chooseMode(button.dataset.id)));
   });
   async function chooseMode(id) {
@@ -86,7 +86,7 @@ export function createBarMenus({ document, root, group, settings, serverDirector
 
   function fillWorkspaceMenu(listing) {
     const menu = $("#zs-ws-menu");
-    menu.innerHTML = workspaceMenuHtml(listing);
+    setHtml(menu, workspaceMenuHtml(listing));
     menu.querySelectorAll(".zs-ws-opt").forEach((button) => button.addEventListener("click", () => useWorkspace(button.dataset.path)));
     // Typing here must not trigger the site's own keyboard shortcuts.
     const input = menu.querySelector(".zs-ws-input");
