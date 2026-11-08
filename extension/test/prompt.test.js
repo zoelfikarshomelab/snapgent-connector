@@ -62,9 +62,9 @@ test("the prompt tells the model the effective Commands per reply when given", (
   assert.ok(ZS.buildSystemPrompt({ calls: 1 }).includes("at most 1 command in one reply"));
   assert.ok(!ZS.buildSystemPrompt({ calls: 1 }).includes("at most 1 commands"));
 });
-test("the prompt tells the model to use relations on the first read and ranges after it, only when offered", () => {
+test("the prompt tells the model the relations footer comes by default and to use ranges after it, only when offered", () => {
   assert.match(prompt, /When read_files offers a relations option/);
-  assert.match(prompt, /`relations: true` only on the first read/);
+  assert.match(prompt, /`relations: false`/);
   assert.match(prompt, /with ranges instead of whole files/);
 });
 test("without a Commands per reply value the prompt keeps the old several wording", () => assert.ok(ZS.buildSystemPrompt().includes("several commands")));

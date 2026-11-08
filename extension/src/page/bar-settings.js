@@ -40,7 +40,7 @@ export function createBarSettings({ document, root, settings, serverDirectory, t
   async function openPreferencesDialog() {
     openPreferences({
       document, values: { ...(await preferences.read()), site: calibration.limits() }, defaults: { folders: preferences.defaultFolders(), contextFiles: preferences.defaultContextFiles() },
-      save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders, contextFiles: preferences.setContextFiles, asFile: preferences.setAsFile, site: calibration.setLimits },
+      save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders, contextFiles: preferences.setContextFiles, asFile: preferences.setAsFile, startContext: preferences.setStartContext, startTree: preferences.setStartTree, site: calibration.setLimits },
       corner: barPrefs.get().corner, actions: actions(),
     });
   }

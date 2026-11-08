@@ -19,6 +19,18 @@ ADAPTERS = {".py": python_adapter.parse, ".php": php_adapter.parse, ".go": go_ad
 # Shared helpers that nearly everything imports: naming them is enough, opening them would only fill the footer.
 HUB_STEMS = frozenset({"logger", "log", "logging", "constants", "consts", "config", "settings", "utils", "util", "helpers", "helper", "common", "types"})
 _HARD_CAP = 400  # the walk stops after this many lines; the footer prints MAX_FOOTER_LINES of them and counts the rest
+# Prose, data and style files: when the footer was not asked for by name they get none, because a note under every README would only cost tokens.
+NON_CODE = frozenset({
+    ".md", ".markdown", ".txt", ".rst", ".json", ".jsonc", ".yml", ".yaml", ".toml", ".ini", ".cfg", ".lock", ".log", ".csv", ".tsv",
+    ".xml", ".svg", ".css", ".scss", ".sass", ".less",
+})
+
+
+def footer_by_default(rel: str) -> bool:
+    """Whether read_files adds a footer to this file when the model did not say either way: source files, and code in a language without an
+    adapter (so that not supported is still told), but not prose, data or files with no extension."""
+    suffix = Path(rel).suffix.lower()
+    return suffix in ADAPTERS or bool(suffix and suffix not in NON_CODE)
 
 # Parsed files by path, valid while the modification time and the size stay the same. Imports are resolved when a file is parsed, so a
 # file created later that an import names is picked up once the importing file changes.

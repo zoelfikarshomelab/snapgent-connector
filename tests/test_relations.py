@@ -208,8 +208,19 @@ class ReadFilesRelationsTests(WorkspaceCase):
         super().setUp()
         write_chain(self)
 
-    def test_relations_are_off_unless_asked_for(self):
-        self.assertNotIn("→", reading.read_files(self.ctx, ["a.py"]))
+    def test_relations_are_on_unless_switched_off(self):
+        self.assertIn("→ rantai pemanggilan:", reading.read_files(self.ctx, ["a.py"]))
+        self.assertIn("→ rantai pemanggilan:", call(self.ctx, "read_files", {"paths": ["a.py"]}))
+        self.assertIn("→ rantai pemanggilan:", reading.read_files(self.ctx, ["a.py"], relations=True))
+        self.assertNotIn("→", reading.read_files(self.ctx, ["a.py"], relations=False))
+        self.assertNotIn("→", reading.read_files(self.ctx, ["a.py"], relations="false"))
+
+    def test_prose_and_data_files_get_no_footer_unless_it_was_asked_for(self):
+        self.write("notes.md", "hi\n")
+        self.write("page.vue", "<template></template>\n")
+        self.assertNotIn("→", reading.read_files(self.ctx, ["notes.md"]))
+        self.assertIn("tidak didukung untuk .md", reading.read_files(self.ctx, ["notes.md"], relations=True))
+        self.assertIn("tidak didukung untuk .vue", reading.read_files(self.ctx, ["page.vue"]))
 
     def test_the_footer_follows_each_file_and_skips_files_read_in_the_same_call(self):
         text = reading.read_files(self.ctx, ["a.py", "b.py"], relations=True)

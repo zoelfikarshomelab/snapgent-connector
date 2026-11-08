@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Tuple
 from ..context import Context
 from ..limits import IGNORED_DIRECTORIES, MAX_FILES_PER_READ, MAX_FILE_CHARS, GIT_LIST_SECONDS, MAX_LISTED_FILES, MAX_OUTPUT_CHARS, MAX_RESULTS, MAX_SEARCH_FILE_BYTES, DEFAULT_RELATIONS_DEPTH, MAX_RELATIONS_DEPTH, MAX_TREE_DEPTH, SEARCH_TIME_SECONDS
 from ..paths import relative, resolve_inside, walk_files
-from ..relations import build_footer
+from ..relations import build_footer, footer_by_default
 from ..process import child_environment
 from ..security import TRUSTED
 from ..security.files import is_sensitive
@@ -211,14 +211,18 @@ def _relative(ctx: Context, path: str):
         return None
 
 
-def _is_on(value) -> bool:
-    """A flag the model may send as text."""
-    return value is True or (isinstance(value, str) and value.strip().lower() == "true")
+def _flag(value, default: bool) -> bool:
+    """A flag the model may send as text; left out (or unreadable) it is `default`."""
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str) and value.strip().lower() in ("true", "false"):
+        return value.strip().lower() == "true"
+    return default
 
 
-def _relations_footer(ctx: Context, path: str, depth, read_here: set) -> str:
+def _relations_footer(ctx: Context, path: str, depth, read_here: set, explicit: bool = True) -> str:
     rel = _relative(ctx, path)
-    if rel is None:
+    if rel is None or (not explicit and not footer_by_default(rel)):
         return ""
     levels = DEFAULT_RELATIONS_DEPTH if depth is None else max(1, min(int(depth), MAX_RELATIONS_DEPTH))
     return build_footer(ctx.root, rel, levels, read_here - {rel})
@@ -263,12 +267,23 @@ def _targets(paths: List[str], ranges) -> List[Tuple[str, Any]]:
     those lines even when `paths` lists it too (the model asked for a piece, not for the file), and a path only in `ranges` comes after the others."""
     wanted: Dict[str, List[Any]] = {}
     if ranges is not None:
+        if isinstance(ranges, str):  # a single path
+            ranges = [ranges]
         if not isinstance(ranges, list):
             raise ValueError('ranges must be a list of [path, lines] pairs, for example [["src/a.js", "21-40"]].')
         for entry in ranges:
-            if not (isinstance(entry, (list, tuple)) and len(entry) == 2 and isinstance(entry[0], str)):
-                raise ValueError('Each ranges entry must be [path, lines], for example ["src/a.js", "21-40"].')
-            wanted.setdefault(entry[0], []).append(entry[1])
+            if isinstance(entry, str):
+                path, rest = entry, []
+            elif isinstance(entry, (list, tuple)) and entry and isinstance(entry[0], str):
+                path, rest = entry[0], list(entry[1:])
+            else:
+                raise ValueError('Each ranges entry must be a path, or [path, lines] such as ["src/a.js", "21-40"]; leave lines out to read the whole file.')
+            spec = rest[0] if len(rest) == 1 else (rest or None)
+            if spec is None or spec == [] or (isinstance(spec, str) and not spec.strip()):
+                spec = None  # no lines given: the whole file
+            wanted.setdefault(path, []).append(spec)
+        # A path asked for whole at least once is read whole, whatever else was asked for it.
+        wanted = {path: (None if any(spec is None for spec in specs) else specs) for path, specs in wanted.items()}
     targets: List[Tuple[str, Any]] = []
     emitted = set()
     for path in paths:
@@ -314,17 +329,19 @@ def _range_block(ctx: Context, path: str, specs: List[Any]) -> str:
 
 @tool("read_files", f"Read up to {MAX_FILES_PER_READ} workspace files as bulk text with line numbers. "
                    f"Total output is capped; files that do not fit are listed as remaining instead of being truncated. "
-                   f"relations=true adds the files each one calls into; ranges reads only some lines.",
+                   f"Optional: ranges ([path, lines] pairs, leave lines out for the whole file) reads only some lines; relations (default true) adds a footer "
+                   f"with the files each one calls into, pass false to skip it; depth (default 3) sets how deep the chain goes; max_total_chars caps the output.",
       {"paths": STR_LIST, "max_total_chars": integer(1, MAX_OUTPUT_CHARS), "ranges": RANGES, "relations": RELATIONS, "depth": DEPTH}, ["paths"], risk=READ)
 def read_files(ctx: Context, paths: List[str], max_total_chars: int = None, ranges: List[Any] = None,
-               relations: bool = False, depth: int = None) -> str:
+               relations: bool = None, depth: int = None) -> str:
     if len(paths) > MAX_FILES_PER_READ:
         raise ValueError(f"Read at most {MAX_FILES_PER_READ} files per request.")
     targets = _targets(paths, ranges)
     if len(targets) > MAX_FILES_PER_READ:
         raise ValueError(f"Read at most {MAX_FILES_PER_READ} files per request.")
     budget = MAX_FILE_CHARS if max_total_chars is None else max(1, min(int(max_total_chars), MAX_OUTPUT_CHARS))
-    relations_on = _is_on(relations)
+    relations_on = _flag(relations, True)
+    explicit = relations is not None
     read_here = {rel for rel in (_relative(ctx, name) for name, _ in targets) if rel} if relations_on else set()
     chunks: List[str] = []
     remaining: List[str] = []
@@ -337,7 +354,7 @@ def read_files(ctx: Context, paths: List[str], max_total_chars: int = None, rang
             continue
         if relations_on:
             try:
-                block += _relations_footer(ctx, path, depth, read_here)
+                block += _relations_footer(ctx, path, depth, read_here, explicit)
             except (OSError, ValueError) as error:
                 block += f"→ relasi: gagal ({error})\n"
         if not chunks and len(block) > budget:

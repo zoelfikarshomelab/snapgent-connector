@@ -41,6 +41,12 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
     : "";
   const asFileBox = `<label class="zs-pref" style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="zs-pref-asfile" style="margin-top:3px"><span><b>Output as file</b>` +
     `<span class="zs-mcp-pop-note" style="display:block">A message longer than the message size is attached to the chat as a .txt file instead of being sent in parts (up to 5, the rest cut). Turn it on only for an AI that reads attached files.</span></span></label>`;
+  const tick = (id, title, note) => `<label class="zs-pref" style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="${id}" style="margin-top:3px"><span><b>${title}</b>` +
+    `<span class="zs-mcp-pop-note" style="display:block">${note}</span></span></label>`;
+  const startBoxes = tick("zs-pref-start-tree", "Send the project tree at the start",
+    "The list of the project's files and folders goes in the first message, within a share of the message size. The folders left out of attachments (below) are left out of it too. Turn it off to save tokens: the AI can still run the tree command.") +
+    tick("zs-pref-start-context", "Send the project instruction files at the start",
+      "The first file found in the list below (usually AGENTS.md) goes in the first message. Turn it off and the AI will not see these instructions unless you point it to the file.");
   const barSection = actions.onToggleCorner
     ? `<section class="zs-menu-sec"><div class="zs-sec-label"><span>This bar</span></div>` +
       row("zs-bar-corner", `Move to the ${otherCorner} corner`) +
@@ -62,7 +68,7 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
     slider("zs-pref-chars", "Message size", MIN_PROMPT_CHARS, MAX_PROMPT_CHARS, CHARS_STEP,
       "The most one message to the chat may hold. Longer output goes in the next messages (up to 5), the rest is cut in the middle. About 4 characters per token.") +
     slider("zs-pref-calls", "Commands per reply", MIN_BATCH_CALLS, MAX_BATCH_CALLS, 1,
-      "How many commands the AI may send in one reply. They run in order and are answered in one message; any beyond it are reported as not run.") + asFileBox + siteBox +
+      "How many commands the AI may send in one reply. They run in order and are answered in one message; any beyond it are reported as not run.") + asFileBox + siteBox + startBoxes +
     (actions.onCopyTest
       ? slider("zs-pref-lorem", "Test text size", MIN_PROMPT_CHARS, MAX_PROMPT_CHARS, CHARS_STEP,
         "Copies this many characters of lorem ipsum to the clipboard, to paste into the chat and see how much one message it accepts. Fill the text box writes it the way the extension writes its own messages, which a site may treat differently from a paste of your own. Nothing is saved.") +
@@ -83,8 +89,8 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
     `<div class="zs-pref"><div style="font-weight:600">Folders left out of attachments</div>` +
     `<textarea id="zs-pref-folders" rows="7" spellcheck="false" style="width:100%;box-sizing:border-box;margin-top:8px;${MONO};background:transparent;color:inherit;${BOX};padding:6px" ` +
     `aria-label="Folders left out of attachments">${esc(values.folders.join("\n"))}</textarea>` +
-    `<div class="zs-mcp-pop-note">One folder name per line (or separated by commas): a folder of that name is skipped wherever it is, in the <code>@</code> list and in the Files menu. ` +
-    `In a git project the project's own <code>.gitignore</code> already applies on top.</div></div>` +
+    `<div class="zs-mcp-pop-note">One folder name per line (or separated by commas): a folder of that name is skipped wherever it is, in the <code>@</code> list, in the Files menu and in the project tree sent at the start. ` +
+    `For the <code>@</code> list, in a git project the project's own <code>.gitignore</code> applies on top.</div></div>` +
     `<div class="zs-pref"><div style="font-weight:600">Project instruction files</div>` +
     `<textarea id="zs-pref-context" rows="4" spellcheck="false" style="width:100%;box-sizing:border-box;margin-top:8px;${MONO};background:transparent;color:inherit;${BOX};padding:6px" ` +
     `aria-label="Project instruction files">${esc(contextFiles.join("\n"))}</textarea>` +
@@ -117,6 +123,12 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
     general.asFile = asFileTick.checked;
     if (save.asFile) save.asFile(asFileTick.checked);
   });
+  // What the start message carries: on unless saved as off, and saved as soon as it is ticked.
+  for (const [id, key, value] of [["zs-pref-start-tree", "startTree", values.startTree], ["zs-pref-start-context", "startContext", values.startContext]]) {
+    const box = pop.querySelector(`#${id}`);
+    box.checked = value !== false;
+    box.addEventListener("change", () => { if (save[key]) save[key](box.checked); });
+  }
   const loremSize = pop.querySelector("#zs-pref-lorem");
   if (loremSize) {
     bind("zs-pref-lorem", 100000, charsText, () => {});
@@ -167,6 +179,9 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
   pop.querySelector("#zs-pref-reset").addEventListener("click", () => {
     folders.value = defaults.folders.join("\n");
     save.folders(defaults.folders);
+    for (const id of ["zs-pref-start-context", "zs-pref-start-tree"]) pop.querySelector(`#${id}`).checked = true;
+    if (save.startContext) save.startContext(true);
+    if (save.startTree) save.startTree(true);
     if (save.contextFiles) {
       contextBox.value = defaultContextFiles.join("\n");
       save.contextFiles(defaultContextFiles);

@@ -293,6 +293,56 @@ describe("project instruction files in the start message", () => {
   });
 });
 
+describe("what the start message carries, from the preferences", () => {
+  const withPrefs = (prefs, over = {}) => setup({
+    state: { responses: [ready], probe: { ok: true, text: "root\n└── a.js" } },
+    deps: { initialContext: { limit: () => 10000 }, startPrefs: async () => prefs, ...over },
+  });
+  const sent = async (t) => {
+    const submitted = [];
+    t.starter._d.chat.submit = async (text) => { submitted.push(text); return "base"; };
+    await t.starter.start();
+    return submitted;
+  };
+
+  test("the folders left out of attachments are asked to be left out of the tree too", async () => {
+    const t = withPrefs({ folders: [".sqlx", "bruno"] });
+    const submitted = await sent(t);
+    assert.ok(t.log.includes(`probe:tree:{"path":".","exclude":[".sqlx","bruno"]}:5000`), t.log.join("|"));
+    assert.ok(submitted[0].includes("a.js"));
+  });
+
+  test("with no folders listed, or no preferences at all, the tree is asked for as before", async () => {
+    const none = withPrefs({ folders: [] });
+    await sent(none);
+    assert.ok(none.log.includes(`probe:tree:{"path":"."}:5000`));
+    const absent = withPrefs({}, { startPrefs: undefined });
+    await sent(absent);
+    assert.ok(absent.log.includes(`probe:tree:{"path":"."}:5000`));
+  });
+
+  test("tree off: the probe reads only the top level and the message carries no tree", async () => {
+    const t = withPrefs({ tree: false, folders: [".sqlx"] });
+    const submitted = await sent(t);
+    assert.ok(t.log.includes(`probe:tree:{"path":".","max_depth":0}:5000`), t.log.join("|"));
+    assert.ok(!submitted[0].includes("a.js") && !submitted[0].includes("root"));
+    assert.ok(t.log.includes("markStarted"));
+  });
+
+  test("instruction files off: none is read and the message carries no instructions", async () => {
+    const reads = [];
+    const t = setup({ state: { responses: [ready] }, deps: {
+      startPrefs: async () => ({ instructions: false }),
+      contextFiles: async () => ["AGENTS.md"],
+      callTool: async (name, args) => { if (name === "read_files") reads.push(args.paths[0]); return { ok: true, text: "root" }; },
+      startMessage: ({ context }) => `START|${context ? context.name : "no context"}`,
+    } });
+    const submitted = await sent(t);
+    assert.deepEqual(reads, []);
+    assert.equal(submitted[0], "START|no context");
+  });
+});
+
 describe("start preconditions", () => {
   const base = { target: "snapgent", targetName: "VS Code", bridgeConnected: true, serverAlive: true, toolNames: ["tree"] };
   test("ready when the probe tool exists", () => assert.equal(checkStartPreconditions(base), null));

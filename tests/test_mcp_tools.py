@@ -220,14 +220,24 @@ class ReadingTests(WorkspaceCase):
     def test_a_bad_range_is_an_error_for_that_file_only(self):
         self._ten_lines()
         self.write("g.txt", "gee\n")
-        for bad in ("9-2", "0-3", "a-b", "2-3,", ""):
+        for bad in ("9-2", "0-3", "a-b", "2-3,"):
             text = reading.read_files(self.ctx, ["f.txt", "g.txt"], ranges=[["f.txt", bad]])
             self.assertIn("ERROR: ", text, bad)
             self.assertIn("1: gee", text, bad)
         self.assertIn("ERROR: ", reading.read_files(self.ctx, [], ranges=[["missing.txt", "1"]]))
 
-    def test_a_ranges_entry_that_is_not_a_path_and_lines_pair_is_refused(self):
-        for bad in (["f.txt"], [["f.txt"]], [["f.txt", "1", "2"]], [[1, "1"]], "f.txt"):
+    def test_an_entry_without_lines_reads_the_whole_file(self):
+        self._ten_lines()
+        whole = [f"{n}: l{n}" for n in range(1, 11)]
+        for entry in (["f.txt"], ["f.txt", None], ["f.txt", ""], ["f.txt", []], "f.txt"):
+            text = reading.read_files(self.ctx, [], ranges=[entry])
+            self.assertEqual(self._numbered_lines(text), whole, repr(entry))
+        self.assertEqual(self._numbered_lines(reading.read_files(self.ctx, [], ranges="f.txt")), whole)
+        mixed = reading.read_files(self.ctx, [], ranges=[["f.txt", "1-2"], "f.txt"])
+        self.assertEqual(self._numbered_lines(mixed), whole)
+
+    def test_a_ranges_entry_that_is_not_a_path_is_refused(self):
+        for bad in ([[1, "1"]], [[]], [5], {"a": 1}):
             with self.assertRaisesRegex(ValueError, "ranges", msg=repr(bad)):
                 reading.read_files(self.ctx, [], ranges=bad)
 
@@ -239,7 +249,7 @@ class ReadingTests(WorkspaceCase):
         self.assertIn("cut at 20 characters", out)
 
     def test_the_secret_check_sees_the_paths_named_in_ranges(self):
-        self.assertEqual(paths_in({"paths": ["a.js"], "ranges": [[".env", "1-2"], "junk", [5, "1"]]}), ["a.js", ".env"])
+        self.assertEqual(paths_in({"paths": ["a.js"], "ranges": [[".env", "1-2"], "junk", [5, "1"], ["k.pem"]]}), ["a.js", ".env", "junk", "k.pem"])
 
 
 class EditingTests(WorkspaceCase):

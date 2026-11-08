@@ -43,8 +43,12 @@ def paths_in(arguments: Dict[str, Any]) -> List[str]:
     if isinstance(arguments.get("paths"), list):
         found.extend(item for item in arguments["paths"] if isinstance(item, str))
     # read_files `ranges` names files too; without this a secret file could be read through it without the approval `paths` would need.
-    if isinstance(arguments.get("ranges"), list):
-        found.extend(item[0] for item in arguments["ranges"] if isinstance(item, (list, tuple)) and item and isinstance(item[0], str))
+    ranges = arguments.get("ranges")
+    if isinstance(ranges, str):
+        ranges = [ranges]
+    if isinstance(ranges, list):  # an entry is a path, or [path, lines]
+        found.extend(item if isinstance(item, str) else item[0] for item in ranges
+                     if isinstance(item, str) or (isinstance(item, (list, tuple)) and item and isinstance(item[0], str)))
     return found
 
 

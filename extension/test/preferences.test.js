@@ -83,7 +83,7 @@ describe("preferences", () => {
 
   test("read() gives what the panel shows", async () => {
     const preferences = createPreferences({ storage: fakeStorage({ [KEYS.chars]: 150000, [KEYS.calls]: 12 }), state: {} });
-    assert.deepEqual(await preferences.read(), { chars: 150000, calls: 12, asFile: false, folders: DEFAULT_EXCLUDED_FOLDERS, contextFiles: DEFAULT_CONTEXT_FILES });
+    assert.deepEqual(await preferences.read(), { chars: 150000, calls: 12, asFile: false, folders: DEFAULT_EXCLUDED_FOLDERS, contextFiles: DEFAULT_CONTEXT_FILES, startContext: true, startTree: true });
   });
 
   test("output as file: off until switched on, saved as true or false, and read back", async () => {
@@ -96,6 +96,26 @@ describe("preferences", () => {
     assert.equal((await preferences.read()).asFile, true);
     preferences.setAsFile("yes");
     assert.equal(storage.data[KEYS.asFile], false, "only true counts");
+  });
+});
+
+describe("what the start message carries", () => {
+  test("the tree and the instruction files are on until switched off, saved as true or false, read back, and a change from another tab is picked up", async () => {
+    const storage = fakeStorage();
+    const preferences = createPreferences({ storage, state: {} });
+    await flush();
+    assert.equal(preferences.startTree(), true);
+    assert.equal(preferences.startContext(), true);
+    preferences.setStartTree(false);
+    preferences.setStartContext(false);
+    assert.equal(storage.data[KEYS.startTree], false);
+    assert.equal(storage.data[KEYS.startContext], false);
+    const read = await preferences.read();
+    assert.deepEqual([read.startContext, read.startTree], [false, false]);
+    storage.set(KEYS.startTree, true);
+    assert.equal(preferences.startTree(), true);
+    preferences.setStartTree("yes");
+    assert.equal(storage.data[KEYS.startTree], false, "only true counts");
   });
 });
 
@@ -155,6 +175,34 @@ describe("preferences panel", () => {
     $("#zs-pref-reset").click();
     assert.equal($("#zs-pref-context").value, "AGENTS.md\nCLAUDE.md\nGEMINI.md");
     assert.deepEqual(saved, [["AGENTS.md", "CLAUDE.md"], ["AGENTS.md", "CLAUDE.md", "GEMINI.md"]]);
+  });
+
+  test("the start message checkboxes are on by default, saved when changed, and ticked again by the defaults", () => {
+    const w = new JSDOM("<!doctype html><body></body>").window;
+    const saved = [];
+    openPreferences({
+      document: w.document, values: { chars: 100000, calls: 8, folders: [] }, defaults: { folders: [] },
+      save: { chars() {}, calls() {}, folders() {}, startContext: (v) => saved.push(["context", v]), startTree: (v) => saved.push(["tree", v]) },
+    });
+    const $ = (selector) => w.document.querySelector(selector);
+    assert.equal($("#zs-pref-start-tree").checked, true);
+    assert.equal($("#zs-pref-start-context").checked, true);
+    $("#zs-pref-start-tree").checked = false;
+    $("#zs-pref-start-tree").dispatchEvent(new w.Event("change", { bubbles: true }));
+    assert.deepEqual(saved, [["tree", false]]);
+    $("#zs-pref-reset").click();
+    assert.equal($("#zs-pref-start-tree").checked, true);
+    assert.deepEqual(saved.slice(1), [["context", true], ["tree", true]]);
+  });
+
+  test("a start message part saved as off is shown unticked", () => {
+    const w = new JSDOM("<!doctype html><body></body>").window;
+    openPreferences({
+      document: w.document, values: { chars: 100000, calls: 8, folders: [], startContext: false, startTree: false }, defaults: { folders: [] },
+      save: { chars() {}, calls() {}, folders() {} },
+    });
+    assert.equal(w.document.querySelector("#zs-pref-start-tree").checked, false);
+    assert.equal(w.document.querySelector("#zs-pref-start-context").checked, false);
   });
 
   test("the reminder test is offered and writes the reminder through its action", () => {

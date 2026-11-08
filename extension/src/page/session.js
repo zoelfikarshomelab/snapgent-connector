@@ -79,6 +79,7 @@ export function createSession({ state, provider, tools, chat, bar, reminder, lim
     },
     isStopped: () => state.stop,
     contextFiles: async () => { const values = await preferences.read(); return values.contextFiles; },
+    startPrefs: async () => { const values = await preferences.read(); return { tree: values.startTree, instructions: values.startContext, folders: values.folders }; },
     diag,
   });
 

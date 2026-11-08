@@ -25,6 +25,7 @@ export class SessionStarter {
    *   workspace: { refresh: () => Promise<void>, choose?: () => Promise<{ path?: string, none?: boolean, cancelled?: boolean, error?: string }> },
    *     // refresh learns which folder is the workspace (the prompt names it); choose settles which folder THIS chat works in, asking the user when VS Code has several
    *   contextFiles?: () => Promise<string[]>,        // instruction files to look for, in order; the first one found is read
+    *   startPrefs?: () => Promise<{ tree?: boolean, instructions?: boolean, folders?: string[] }>, // what the start message carries (both on unless false), and the folders its tree leaves out
    *   startMessage: (parts: { commands: string, tree: string, context?: { name: string, text: string } | null }) => string,
    *   chat: { submit: (text: string) => Promise<*>, next: (base: *) => Promise<object> },
    *   runner: { run: (call: object) => Promise<string> },
@@ -95,17 +96,23 @@ export class SessionStarter {
 
     if (workspaceTarget) {
       const probeTool = catalogue.active().find((tool) => bareToolName(tool.name) === WORKSPACE_PROBE_TOOL);
-      const probe = await callTool(probeTool.name, { path: "." }, 5000);
+      const prefs = this._d.startPrefs ? await this._d.startPrefs() : {};
+      const wantTree = prefs.tree !== false;
+      const wantInstructions = prefs.instructions !== false;
+      // The folders the user left out of the attachable files are left out of the tree too (the server adds them to its own list). Without the tree the probe only has to prove a folder is open, so it reads the top level.
+      const folders = Array.isArray(prefs.folders) ? prefs.folders : [];
+      const probeArgs = !wantTree ? { path: ".", max_depth: 0 } : folders.length ? { path: ".", exclude: folders } : { path: "." };
+      const probe = await callTool(probeTool.name, probeArgs, 5000);
       if (!alive()) return false;
       if (!probeSucceeded(probe)) {
         const banner = workspaceRequiredBanner();
         view.banner("warn", banner.title, banner.text);
         return false;
       }
-      this._tree = typeof probe.text === "string" ? probe.text.trim() : "";
+      this._tree = wantTree && typeof probe.text === "string" ? probe.text.trim() : "";
 
       this._context = null; // a next start in another folder (or with the file gone) must not reuse this chat's instructions
-      const contextNames = this._d.contextFiles ? await this._d.contextFiles() : [];
+      const contextNames = wantInstructions && this._d.contextFiles ? await this._d.contextFiles() : [];
       for (const name of contextNames) {
         const result = await this._d.callTool("read_files", { paths: [name], max_total_chars: 10000 }, 3000);
         if (result && result.ok && typeof result.text === "string" && !result.text.includes("File not found")) {

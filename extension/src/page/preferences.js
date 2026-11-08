@@ -6,7 +6,7 @@
 import { DEFAULT_BATCH_CALLS, DEFAULT_EXCLUDED_FOLDERS, clampBatchCalls, clampExcludedFolders, clampPromptChars } from "../domain/index.js";
 import { clampContextFiles, DEFAULT_CONTEXT_FILES } from "../domain/prompt/context-file.js";
 
-export const KEYS = { chars: "zsMaxPromptChars", calls: "zsMaxBatchCalls", folders: "zsExcludedFolders", contextFiles: "zsContextFiles", asFile: "zsOutputAsFile" };
+export const KEYS = { chars: "zsMaxPromptChars", calls: "zsMaxBatchCalls", folders: "zsExcludedFolders", contextFiles: "zsContextFiles", asFile: "zsOutputAsFile", startContext: "zsStartContext", startTree: "zsStartTree" };
 
 /** @param {{ storage: object, state: object }} deps  `state.filesChangedAt` is bumped when the excluded folders change: the file list is then out of date */
 export function createPreferences({ storage, state, defaults }) {
@@ -26,16 +26,30 @@ export function createPreferences({ storage, state, defaults }) {
   storage.get(KEYS.asFile).then((saved) => { asFile = saved === true; });
   storage.watch(KEYS.asFile, (saved) => { asFile = saved === true; });
 
+  // What the start message carries: both parts are on until the user switches them off.
+  let startContext = true;
+  let startTree = true;
+  storage.get(KEYS.startContext).then((saved) => { startContext = saved !== false; });
+  storage.watch(KEYS.startContext, (saved) => { startContext = saved !== false; });
+  storage.get(KEYS.startTree).then((saved) => { startTree = saved !== false; });
+  storage.watch(KEYS.startTree, (saved) => { startTree = saved !== false; });
+
   return {
     /** Whether a message over the size goes to the chat as a file (the general value; an AI's calibration may set its own). */
     asFile: () => asFile,
     setAsFile(value) { asFile = value === true; storage.set(KEYS.asFile, asFile); },
+    /** Whether the first file found among the project instruction files goes into the start message. */
+    startContext: () => startContext,
+    setStartContext(value) { startContext = value === true; storage.set(KEYS.startContext, startContext); },
+    /** Whether the project tree goes into the start message. */
+    startTree: () => startTree,
+    setStartTree(value) { startTree = value === true; storage.set(KEYS.startTree, startTree); },
     /** The folder names to leave out of the attachable files, as saved (the defaults until the user changes them). */
     excludedFolders: () => folders,
     /** What the panel shows. */
     async read() {
-      const [chars, calls, saved, savedContext, savedAsFile] = await Promise.all([storage.get(KEYS.chars), storage.get(KEYS.calls), storage.get(KEYS.folders), storage.get(KEYS.contextFiles), storage.get(KEYS.asFile)]);
-      return { chars: clampPromptChars(chars), calls: clampBatchCalls(calls ?? DEFAULT_BATCH_CALLS), asFile: savedAsFile === true, folders: clampExcludedFolders(saved, defaultFolders), contextFiles: clampContextFiles(savedContext, defaultContextFiles) };
+      const [chars, calls, saved, savedContext, savedAsFile, savedStartContext, savedStartTree] = await Promise.all([storage.get(KEYS.chars), storage.get(KEYS.calls), storage.get(KEYS.folders), storage.get(KEYS.contextFiles), storage.get(KEYS.asFile), storage.get(KEYS.startContext), storage.get(KEYS.startTree)]);
+      return { chars: clampPromptChars(chars), calls: clampBatchCalls(calls ?? DEFAULT_BATCH_CALLS), asFile: savedAsFile === true, folders: clampExcludedFolders(saved, defaultFolders), contextFiles: clampContextFiles(savedContext, defaultContextFiles), startContext: savedStartContext !== false, startTree: savedStartTree !== false };
     },
     setChars: (value) => storage.set(KEYS.chars, clampPromptChars(value)),
     setCalls: (value) => storage.set(KEYS.calls, clampBatchCalls(value)),
