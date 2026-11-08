@@ -16,6 +16,9 @@ MAX_FILES_PER_READ = 50
 MAX_SEARCH_FILE_BYTES = 1_000_000     # search_files skips bigger files (bundles, dumps, logs)
 SEARCH_TIME_SECONDS = 20              # search_files returns what it has found by then, and says so
 MAX_LINES_PER_READ = 1000
+DEFAULT_RELATIONS_DEPTH = 3           # read_files(relations=true): how many calls deep the chain goes unless told otherwise
+MAX_RELATIONS_DEPTH = 8
+MAX_FOOTER_LINES = 28                 # the most lines of that chain printed per file; the rest is counted as "+N lainnya"
 MAX_TREE_DEPTH = 8
 SAFE_PROJECT_SCRIPTS = frozenset({"build", "check", "format", "lint", "test", "typecheck"})
 

@@ -8,6 +8,7 @@ from snapgent_mcp import limits
 from snapgent_mcp.context import Context
 from snapgent_mcp.tools import all_tools, call, get, registry, schemas
 from snapgent_mcp.tools import commands, editing, git as git_tools, project, reading
+from snapgent_mcp.security.decision import paths_in
 from tests.mcp_support import WorkspaceCase, git
 
 
@@ -176,6 +177,70 @@ class ReadingTests(WorkspaceCase):
     def test_read_files_escape(self):
         text = reading.read_files(self.ctx, ["../outside.txt"])
         self.assertIn("escapes workspace", text)
+
+    def _ten_lines(self):
+        self.write("f.txt", "".join(f"l{n}\n" for n in range(1, 11)))
+
+    @staticmethod
+    def _numbered_lines(text):
+        return [line for line in text.splitlines() if line[:1].isdigit()]
+
+    def test_ranges_read_only_those_lines_with_the_files_own_numbers(self):
+        self._ten_lines()
+        text = reading.read_files(self.ctx, [], ranges=[["f.txt", "2-3"]])
+        self.assertIn("===== f.txt =====", text)
+        self.assertEqual(self._numbered_lines(text), ["2: l2", "3: l3"])
+
+    def test_ranges_accept_several_ranges_as_a_string_or_a_list(self):
+        self._ten_lines()
+        for spec in ("2-3,7", ["2-3", "7"]):
+            text = reading.read_files(self.ctx, ["f.txt"], ranges=[["f.txt", spec]])
+            self.assertEqual(self._numbered_lines(text), ["2: l2", "3: l3", "7: l7"], spec)
+
+    def test_overlapping_ranges_and_repeated_entries_print_each_line_once(self):
+        self._ten_lines()
+        text = reading.read_files(self.ctx, [], ranges=[["f.txt", "2-4,3-5"], ["f.txt", "5"]])
+        self.assertEqual(self._numbered_lines(text), ["2: l2", "3: l3", "4: l4", "5: l5"])
+
+    def test_a_path_in_ranges_is_not_also_read_whole_and_other_paths_are(self):
+        self._ten_lines()
+        self.write("g.txt", "gee\n")
+        text = reading.read_files(self.ctx, ["f.txt", "g.txt"], ranges=[["f.txt", "1"]])
+        self.assertEqual(self._numbered_lines(text), ["1: l1", "1: gee"])
+
+    def test_a_range_past_the_end_is_cut_and_the_file_length_is_said(self):
+        self._ten_lines()
+        cut = reading.read_files(self.ctx, [], ranges=[["f.txt", "8-20"]])
+        self.assertEqual(self._numbered_lines(cut), ["8: l8", "9: l9", "10: l10"])
+        self.assertIn("only 10 lines", cut)
+        beyond = reading.read_files(self.ctx, [], ranges=[["f.txt", "50-60"]])
+        self.assertEqual(self._numbered_lines(beyond), [])
+        self.assertIn("past the end", beyond)
+
+    def test_a_bad_range_is_an_error_for_that_file_only(self):
+        self._ten_lines()
+        self.write("g.txt", "gee\n")
+        for bad in ("9-2", "0-3", "a-b", "2-3,", ""):
+            text = reading.read_files(self.ctx, ["f.txt", "g.txt"], ranges=[["f.txt", bad]])
+            self.assertIn("ERROR: ", text, bad)
+            self.assertIn("1: gee", text, bad)
+        self.assertIn("ERROR: ", reading.read_files(self.ctx, [], ranges=[["missing.txt", "1"]]))
+
+    def test_a_ranges_entry_that_is_not_a_path_and_lines_pair_is_refused(self):
+        for bad in (["f.txt"], [["f.txt"]], [["f.txt", "1", "2"]], [[1, "1"]], "f.txt"):
+            with self.assertRaisesRegex(ValueError, "ranges", msg=repr(bad)):
+                reading.read_files(self.ctx, [], ranges=bad)
+
+    def test_ranges_work_through_the_tool_call_and_count_toward_the_budget(self):
+        self._ten_lines()
+        text = call(self.ctx, "read_files", {"paths": ["f.txt"], "ranges": [["f.txt", "1-2"]]})
+        self.assertEqual(self._numbered_lines(text), ["1: l1", "2: l2"])
+        out = reading.read_files(self.ctx, ["f.txt"], max_total_chars=20, ranges=[["f.txt", "1-10"]])
+        self.assertIn("cut at 20 characters", out)
+
+    def test_the_secret_check_sees_the_paths_named_in_ranges(self):
+        self.assertEqual(paths_in({"paths": ["a.js"], "ranges": [[".env", "1-2"], "junk", [5, "1"]]}), ["a.js", ".env"])
+
 
 class EditingTests(WorkspaceCase):
     def test_create_never_overwrites_and_makes_parents(self):

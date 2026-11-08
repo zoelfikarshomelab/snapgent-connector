@@ -2,19 +2,21 @@
 
 import fnmatch
 import os
+import re
 import subprocess
 import time
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from ..context import Context
-from ..limits import IGNORED_DIRECTORIES, MAX_FILES_PER_READ, MAX_FILE_CHARS, GIT_LIST_SECONDS, MAX_LISTED_FILES, MAX_OUTPUT_CHARS, MAX_RESULTS, MAX_SEARCH_FILE_BYTES, MAX_TREE_DEPTH, SEARCH_TIME_SECONDS
+from ..limits import IGNORED_DIRECTORIES, MAX_FILES_PER_READ, MAX_FILE_CHARS, GIT_LIST_SECONDS, MAX_LISTED_FILES, MAX_OUTPUT_CHARS, MAX_RESULTS, MAX_SEARCH_FILE_BYTES, DEFAULT_RELATIONS_DEPTH, MAX_RELATIONS_DEPTH, MAX_TREE_DEPTH, SEARCH_TIME_SECONDS
 from ..paths import relative, resolve_inside, walk_files
+from ..relations import build_footer
 from ..process import child_environment
 from ..security import TRUSTED
 from ..security.files import is_sensitive
 from .registry import READ, tool
-from .schema import BOOL, STR, STR_LIST, integer
+from .schema import BOOL, DEPTH, RANGES, RELATIONS, STR, STR_LIST, integer
 
 # Junk that is almost never useful as source context, on top of IGNORED_DIRECTORIES.
 # Kept as names so it works regardless of where in the tree they appear.
@@ -201,24 +203,143 @@ def _read(ctx: Context, path: str) -> str:
     return content[:MAX_FILE_CHARS] + "\n[truncated]" if len(content) > MAX_FILE_CHARS else content
 
 
+def _relative(ctx: Context, path: str):
+    """The workspace-relative form of `path`, or None when it leaves the workspace."""
+    try:
+        return relative(resolve_inside(path, ctx.root), ctx.root)
+    except ValueError:
+        return None
+
+
+def _is_on(value) -> bool:
+    """A flag the model may send as text."""
+    return value is True or (isinstance(value, str) and value.strip().lower() == "true")
+
+
+def _relations_footer(ctx: Context, path: str, depth, read_here: set) -> str:
+    rel = _relative(ctx, path)
+    if rel is None:
+        return ""
+    levels = DEFAULT_RELATIONS_DEPTH if depth is None else max(1, min(int(depth), MAX_RELATIONS_DEPTH))
+    return build_footer(ctx.root, rel, levels, read_here - {rel})
+
+
+_LINE_RANGE = re.compile(r"(\d+)(?:\s*-\s*(\d+))?")
+
+
+def _parse_lines(spec) -> List[Tuple[int, int]]:
+    """Inclusive 1-based (start, end) pairs from "21-40", "5-10,40-60", a single line "7", or a list of such strings."""
+    items = [spec] if isinstance(spec, str) else spec
+    if not isinstance(items, (list, tuple)) or not items or not all(isinstance(item, str) for item in items):
+        raise ValueError('lines must be a string like "21-40" or "5-10,40-60", or a list of such strings.')
+    found: List[Tuple[int, int]] = []
+    for item in items:
+        for part in item.split(","):
+            text = part.strip()
+            match = _LINE_RANGE.fullmatch(text)
+            if not match:
+                raise ValueError(f'Bad line range "{text}": use "21-40" or a single line such as "7".')
+            start = int(match.group(1))
+            end = int(match.group(2) or start)
+            if start < 1 or end < start:
+                raise ValueError(f'Bad line range "{text}": lines start at 1 and the end cannot come before the start.')
+            found.append((start, end))
+    return found
+
+
+def _merge_ranges(found: List[Tuple[int, int]]) -> List[Tuple[int, int]]:
+    """Sorted, with overlapping or touching ranges joined, so no line is printed twice."""
+    merged: List[List[int]] = []
+    for start, end in sorted(found):
+        if merged and start <= merged[-1][1] + 1:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    return [(start, end) for start, end in merged]
+
+
+def _targets(paths: List[str], ranges) -> List[Tuple[str, Any]]:
+    """What to read, in order, as `(path, line specs)`; the specs are None for a whole file. A path named in `ranges` is read only for
+    those lines even when `paths` lists it too (the model asked for a piece, not for the file), and a path only in `ranges` comes after the others."""
+    wanted: Dict[str, List[Any]] = {}
+    if ranges is not None:
+        if not isinstance(ranges, list):
+            raise ValueError('ranges must be a list of [path, lines] pairs, for example [["src/a.js", "21-40"]].')
+        for entry in ranges:
+            if not (isinstance(entry, (list, tuple)) and len(entry) == 2 and isinstance(entry[0], str)):
+                raise ValueError('Each ranges entry must be [path, lines], for example ["src/a.js", "21-40"].')
+            wanted.setdefault(entry[0], []).append(entry[1])
+    targets: List[Tuple[str, Any]] = []
+    emitted = set()
+    for path in paths:
+        if path not in wanted:
+            targets.append((path, None))
+        elif path not in emitted:
+            targets.append((path, wanted[path]))
+            emitted.add(path)
+    targets.extend((path, specs) for path, specs in wanted.items() if path not in emitted)
+    return targets
+
+
+def _full_block(ctx: Context, path: str) -> str:
+    content = _read(ctx, path)
+    numbered = "\n".join(f"{number}: {line}" for number, line in enumerate(content.splitlines(), start=1))
+    return f"===== {path} =====\n{numbered}\n"
+
+
+def _range_block(ctx: Context, path: str, specs: List[Any]) -> str:
+    """Only the asked lines, numbered as in the file so they match edit_file and the relations footer. A range that runs past the end is
+    cut there and a note says how long the file is, so the model knows it saw everything that exists."""
+    target = resolve_inside(path, ctx.root)
+    if not target.is_file():
+        raise FileNotFoundError(f"File not found: {path}")
+    wanted: List[Tuple[int, int]] = []
+    for spec in specs:
+        wanted.extend(_parse_lines(spec))
+    lines = target.read_text(encoding="utf-8", errors="replace").splitlines()
+    total = len(lines)
+    notes: List[str] = []
+    shown: List[str] = []
+    for start, end in _merge_ranges(wanted):
+        if start > total:
+            notes.append(f"[lines {start}-{end} are past the end: the file has only {total} lines]")
+            continue
+        if end > total:
+            notes.append(f"[lines {start}-{end} cut at line {total}: the file has only {total} lines]")
+            end = total
+        shown.extend(f"{number}: {lines[number - 1]}" for number in range(start, end + 1))
+    body = "\n".join(notes + shown)
+    return f"===== {path} =====\n{body}\n" if body else f"===== {path} =====\n"
+
+
 @tool("read_files", f"Read up to {MAX_FILES_PER_READ} workspace files as bulk text with line numbers. "
-                   f"Total output is capped; files that do not fit are listed as remaining instead of being truncated.",
-      {"paths": STR_LIST, "max_total_chars": integer(1, MAX_OUTPUT_CHARS)}, ["paths"], risk=READ)
-def read_files(ctx: Context, paths: List[str], max_total_chars: int = None) -> str:
+                   f"Total output is capped; files that do not fit are listed as remaining instead of being truncated. "
+                   f"relations=true adds the files each one calls into; ranges reads only some lines.",
+      {"paths": STR_LIST, "max_total_chars": integer(1, MAX_OUTPUT_CHARS), "ranges": RANGES, "relations": RELATIONS, "depth": DEPTH}, ["paths"], risk=READ)
+def read_files(ctx: Context, paths: List[str], max_total_chars: int = None, ranges: List[Any] = None,
+               relations: bool = False, depth: int = None) -> str:
     if len(paths) > MAX_FILES_PER_READ:
         raise ValueError(f"Read at most {MAX_FILES_PER_READ} files per request.")
+    targets = _targets(paths, ranges)
+    if len(targets) > MAX_FILES_PER_READ:
+        raise ValueError(f"Read at most {MAX_FILES_PER_READ} files per request.")
     budget = MAX_FILE_CHARS if max_total_chars is None else max(1, min(int(max_total_chars), MAX_OUTPUT_CHARS))
+    relations_on = _is_on(relations)
+    read_here = {rel for rel in (_relative(ctx, name) for name, _ in targets) if rel} if relations_on else set()
     chunks: List[str] = []
     remaining: List[str] = []
     used = 0
-    for path in paths:
+    for path, specs in targets:
         try:
-            content = _read(ctx, path)
+            block = _full_block(ctx, path) if specs is None else _range_block(ctx, path, specs)
         except (FileNotFoundError, ValueError, OSError) as error:
             chunks.append(f"===== {path} =====\nERROR: {error}\n")
             continue
-        numbered = "\n".join(f"{number}: {line}" for number, line in enumerate(content.splitlines(), start=1))
-        block = f"===== {path} =====\n{numbered}\n"
+        if relations_on:
+            try:
+                block += _relations_footer(ctx, path, depth, read_here)
+            except (OSError, ValueError) as error:
+                block += f"→ relasi: gagal ({error})\n"
         if not chunks and len(block) > budget:
             # Even the first file would overflow the budget: keep its start rather than blow the limit.
             block = block[:budget] + f"\n[cut at {budget:,} characters: this file is larger than the space left]\n"
