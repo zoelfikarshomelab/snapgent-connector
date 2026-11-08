@@ -85,6 +85,7 @@ bar = createBar({
   onStart: () => session.start(),
   onStop: () => stop.stopLoop(),
   onPlay: () => replay.play(),
+  onAdopt: () => session.adopt(),
   onToggleMode: () => { if (!agentMode.toggle()) bar.toast("Send a message first · this chat has no id yet"); },
 });
 

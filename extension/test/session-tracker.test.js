@@ -90,6 +90,29 @@ describe("SessionTracker: is this conversation a session", () => {
   });
 });
 
+describe("SessionTracker: adopting a conversation the extension lost track of", () => {
+  test("a chat with content is remembered as started, and stays started on the next sync", async () => {
+    const { t, writes } = await tracker([]);
+    assert.equal(t.adopt("/c/1", { chatEmpty: false }), true);
+    assert.deepEqual(writes, [["zsStartedSessions", ["/c/1"]]]);
+    assert.equal(t.decide(facts({ started: false })).started, true);
+  });
+
+  test("an empty chat, or one with no id yet, is refused: there is nothing to carry on from", async () => {
+    const { t, writes } = await tracker([]);
+    assert.equal(t.adopt("/c/1", { chatEmpty: true }), false);
+    assert.equal(t.adopt("", { chatEmpty: false }), false);
+    assert.deepEqual(writes, []);
+    assert.equal(t.decide(facts({ key: "", markerInDom: () => false })).started, undefined);
+  });
+
+  test("adopting a conversation already remembered writes nothing new", async () => {
+    const { t, writes } = await tracker(["/c/1"]);
+    assert.equal(t.adopt("/c/1", { chatEmpty: false }), true);
+    assert.deepEqual(writes, []);
+  });
+});
+
 describe("SessionTracker: the user moved to another conversation", () => {
   test("a bootstrap pins its conversation once the chat has an id and content", async () => {
     const { t } = await tracker([]);

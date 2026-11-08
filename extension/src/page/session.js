@@ -113,7 +113,29 @@ export function createSession({ state, provider, tools, chat, bar, reminder, lim
     bar.render();
   }
 
+  /**
+   * The user says this open conversation is a session the extension lost track of (it was reinstalled, or the chat began
+   * long before). Nothing is sent: the chat keeps its history and the next Play reads its last reply, so a batch that was
+   * cut off is carried on instead of a whole start message being repeated.
+   */
+  async function adopt() {
+    if (state.started || state.starting || state.running || state.injecting) return;
+    // The tracker writes its whole remembered set; adopting before the saved set is loaded would overwrite it.
+    await tracker.ready;
+    const chatEmpty = provider.chatIsEmpty();
+    if (!tracker.adopt(provider.conversationKey(), { chatEmpty })) {
+      bar.toast(chatEmpty ? "Use Start on an empty chat." : "Send a message first · this chat has no id yet");
+      return;
+    }
+    // A halt or a Stop from an earlier attempt must not hold the resumed conversation back.
+    state.userStopped = false;
+    state.stop = false;
+    state.started = true;
+    bar.render();
+    bar.toast("Agent on in this chat · ▶ reads the last reply");
+  }
+
   tracker.ready.then(sync);
 
-  return { start: () => starter.start(), previewStartMessage: () => starter.preview(), sync };
+  return { start: () => starter.start(), previewStartMessage: () => starter.preview(), adopt, sync };
 }

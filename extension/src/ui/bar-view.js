@@ -29,7 +29,7 @@ import { escapeHtml } from "./html.js";
  * @property {boolean} spinner
  * @property {string} message           HTML.
  * @property {string} label             Text of the primary button.
- * @property {""|"start"|"starting"|"calibrate"} kind  "" = no primary action.
+ * @property {""|"start"|"starting"|"calibrate"|"adopt"} kind  "" = no primary action.
  * @property {boolean} disabled
  * @property {boolean} warn
  */
@@ -78,7 +78,9 @@ export function computeBarView(state) {
   if (state.starting) result = view("starting", "Starting…", { spinner: true, label: "Starting…", kind: "starting", disabled: true });
   else if (state.started) result = whileStarted(state);
   else if (state.blankChat) result = beforeStart(state);
-  else result = view("noagent", "No agent. Open a new chat.");
+  // A conversation this extension did not start (it was reinstalled, or the chat began before it): the agent can carry on
+  // here without a new start message, so the way out is an action rather than a dead end.
+  else result = view("noagent", "<b>No agent in this chat</b>", { label: "▶︎ Resume", kind: "adopt" });
 
   // Discussion mode: the agent is off in this chat, so "Active" would be untrue.
   if (state.discuss && state.started && !state.starting) result = view("standby", "<b>Discussion</b> · agent off");

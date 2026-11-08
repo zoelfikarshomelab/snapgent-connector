@@ -52,8 +52,8 @@ describe("bar view: before a session", () => {
     assert.equal(bar({ target: { id: "x", name: "X" }, workspaceReady: false }).kind, "start");
   });
 
-  test("an existing conversation we did not start: informs only", () => {
-    assert.deepEqual(bar({ blankChat: false }), { tone: "noagent", message: "No agent. Open a new chat.", spinner: false, label: "", kind: "", disabled: false, warn: false });
+  test("an existing conversation we did not start offers Resume, without sending anything", () => {
+    assert.deepEqual(bar({ blankChat: false }), { tone: "noagent", message: "<b>No agent in this chat</b>", spinner: false, label: "▶︎ Resume", kind: "adopt", disabled: false, warn: false });
   });
 });
 

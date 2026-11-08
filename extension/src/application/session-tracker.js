@@ -47,6 +47,19 @@ export class SessionTracker {
   }
 
   /**
+   * The user says this open conversation IS a session the extension lost track of: it was reinstalled, or the chat began
+   * before this build. Nothing is sent and nothing is replayed; the conversation is only remembered as started, so the
+   * next sync keeps it and Play can read its last reply. Refused when there is no conversation key yet (a chat still on
+   * "/app" before it gets its id) and on an empty chat, which has nothing to carry on from.
+   * @returns {boolean} whether the chat is now remembered as a session
+   */
+  adopt(key, { chatEmpty }) {
+    if (!key || chatEmpty) return false;
+    this.remember(key);
+    return true;
+  }
+
+  /**
    * @param {{ starting: boolean, startingKey: string|null, running: boolean, loopKey: string|null, injecting: boolean,
    *           started: boolean, key: string, chatEmpty: boolean, markerInDom: () => boolean }} f
    *   `markerInDom` is a function because scanning the page is only worth it when the answer can matter.

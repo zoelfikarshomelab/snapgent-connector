@@ -54,7 +54,7 @@ const TEMPLATE = `
  * @param {{ document: Document, window: Window, provider: object, state: object, settings: object, serverDirectory: object, tools: object,
  *           monitor: object, storage: object, preferences: object, send: Function, calibration: object, files: object, onStart: () => void, onStop: () => void }} deps
  */
-export function createBar({ document, window, provider, state, settings, serverDirectory, tools, monitor, storage, preferences, send, calibration, terminal, files, onStart, onStop, onPlay, onToggleMode }) {
+export function createBar({ document, window, provider, state, settings, serverDirectory, tools, monitor, storage, preferences, send, calibration, terminal, files, onStart, onStop, onPlay, onToggleMode, onAdopt }) {
   const root = document.createElement("div");
   root.id = "zs-root";
   const notifications = createNotifications({ root });
@@ -148,6 +148,7 @@ export function createBar({ document, window, provider, state, settings, serverD
 
   el.action.addEventListener("click", () => {
     if (el.action.dataset.kind === "start") onStart();
+    else if (el.action.dataset.kind === "adopt") { if (onAdopt) onAdopt(); }
     else if (el.action.dataset.kind === "calibrate") {
       // A part that stopped matching is redone on its own; a site never calibrated is done from the start.
       const problem = provider.health && provider.health().problems[0];
