@@ -6,7 +6,7 @@ import { SITES, allMatches } from "../src/sites/registry.js";
 const needsCookies = (sites) => (sites.some((site) => site.accounts) ? ["cookies"] : []);
 
 export const TARGETS = ["chrome", "firefox"];
-const GECKO_ID = "snapgent@herdodp.github.io";
+const GECKO_ID = "snapgent@zoelfikars.github.io";
 // Firefox 140 (Android 142) is the first release that knows `data_collection_permissions`, which addons.mozilla.org asks for.
 const FIREFOX_MIN_VERSION = "140.0";
 const FIREFOX_ANDROID_MIN_VERSION = "142.0";
