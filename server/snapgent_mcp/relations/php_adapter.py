@@ -141,6 +141,26 @@ def _application(root: Path, rel: str) -> Optional[Path]:
     return None
 
 
+def _on_disk(root: Path, candidate: Path) -> Optional[str]:
+    """The path a candidate really has on disk, as the disk spells it, or None when there is no such file.
+
+    Windows and macOS compare file names without case, so the CI3 guess `user_model.php` opens `User_model.php` there and the
+    footer would name a path that does not exist on Linux. The folder's own names are what is reported, so every platform agrees."""
+    if not inside(candidate, root) or not candidate.is_file():
+        return None
+    try:
+        spelled = {name.lower(): name for name in os.listdir(candidate.parent)}
+    except OSError:
+        return None
+    name = spelled.get(candidate.name.lower())
+    if name is None:
+        return None
+    actual = candidate.parent / name
+    if not actual.is_file():
+        return None
+    return actual.relative_to(root).as_posix()
+
+
 def _loaded_file(root: Path, app: Path, kind: str, name: str) -> Optional[str]:
     """The file CodeIgniter would load for `load->kind(name)`. Names may carry a subfolder; the file name is tried as written, with a capital first
     letter (the CI3 convention) and in lower case."""
@@ -155,8 +175,9 @@ def _loaded_file(root: Path, app: Path, kind: str, name: str) -> Optional[str]:
     folder = app / _FOLDERS[kind]
     for variant in variants:
         candidate = Path(os.path.normpath(str(folder.joinpath(*parts[:-1], variant + ".php"))))
-        if inside(candidate, root) and candidate.is_file():
-            return candidate.relative_to(root).as_posix()
+        found = _on_disk(root, candidate)
+        if found is not None:
+            return found
     return None
 
 
@@ -206,8 +227,10 @@ def _included(root: Path, here: Path, match) -> Optional[str]:
         candidates = [here / spec, root / spec]
     for candidate in candidates:
         path = Path(os.path.normpath(str(candidate)))
-        if path.suffix.lower() == ".php" and inside(path, root) and path.is_file():
-            return path.relative_to(root).as_posix()
+        if path.suffix.lower() == ".php":
+            found = _on_disk(root, path)
+            if found is not None:
+                return found
     return None
 
 

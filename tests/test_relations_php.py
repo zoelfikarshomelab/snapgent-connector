@@ -85,6 +85,22 @@ class CodeIgniterTests(WorkspaceCase):
         self.assertEqual(build_footer(self.root, REPORTS, 3), footer_of(
             "→ rantai pemanggilan:", "  application/models/User_model.php: diimpor, pemanggilan tidak terdeteksi"))
 
+    def test_the_reported_path_is_spelled_as_the_disk_spells_it(self):
+        # Windows and macOS compare names without case, so the CI3 guess `user_model.php` opens `User_model.php` there and the
+        # footer would name a path that does not exist on Linux. The footer must carry the on-disk spelling, whatever case the
+        # loader used, so the same project gives the same footer on every platform.
+        self.write(REPORTS, src("""
+            <?php
+            class Reports extends CI_Controller {
+                public function index() {
+                    $this->load->model('user_model');
+                    $this->user_model->get_all();
+                }
+            }
+            """))
+        self.assertEqual(build_footer(self.root, REPORTS, 3), footer_of(
+            "→ rantai pemanggilan:", f"  application/models/User_model.php: User_model::get_all() L3-5  ← dipanggil {REPORTS} L5"))
+
     def test_the_array_form_and_system_libraries_are_not_claimed(self):
         self.write(REPORTS, src("""
             <?php
