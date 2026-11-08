@@ -9,7 +9,7 @@ test("the prompt opens with the project, in plain words and with no tag", () => 
 test("the prompt says where the project is and that it is a git repository", () => assert.ok(prompt.includes("/home/me/snapgent-connector and it is a git repository")));
 test("without a known workspace it speaks of this folder", () => assert.ok(ZS.buildSystemPrompt().startsWith("This folder is your current workspace.")));
 test("the prompt names the target", () => assert.ok(prompt.includes("VS Code")));
-test("the prompt looks like nothing a bot or a system tag would say", () => assert.ok(!/CONTEXT:|ZS-SYS|snapgentV3|extension|━━━|SYSTEM/.test(prompt)));
+test("the prompt looks like nothing a bot or a system tag would say", () => assert.ok(!/CONTEXT:|ZS-SYS|snapgent|extension|━━━|SYSTEM/.test(prompt.replaceAll(workspace.name, ""))));
 test("system prompt carries no Roblox leftovers", () => assert.ok(!/roblox|luau|###LUA/i.test(prompt)));
 
 const custom = ZS.buildSystemPrompt({ customPrompt: "Reply in Indonesian", providerNotes: "site note" });

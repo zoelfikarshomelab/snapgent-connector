@@ -59,7 +59,7 @@ export function createConfirmDialog({
       const shadow = host.attachShadow({ mode: shadowMode });
       setHtml(shadow, `<style>${STYLE}</style><dialog aria-labelledby="t">
         <div class="body">
-          <p class="eyebrow">snapgentV3</p>
+          <p class="eyebrow">snapgent</p>
           <span class="risk"></span>
           <h2 id="t">The AI wants to do this:</h2>
           <pre class="action"></pre>

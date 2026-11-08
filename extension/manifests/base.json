@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "name": "snapgentV3",
+  "name": "snapgent",
   "description": "Turn ChatGPT, Claude, DeepSeek, Gemini, Grok, Kimi, GLM, Qwen, Arena, Meta AI, Ptero or Mistral into a VS Code agent through a local bridge.",
   "permissions": [
     "storage"
@@ -12,7 +12,7 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "snapgentV3",
+    "default_title": "snapgent",
     "default_icon": {
       "16": "icon-16.png",
       "48": "icon-48.png",

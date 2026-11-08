@@ -71,7 +71,7 @@ async def ask_in_terminal(origin: str) -> bool:
         "\n"
         f"      {origin}\n"
         "\n"
-        "  Approve it ONLY if it is your own snapgentV3 extension (it will stay approved).\n"
+        "  Approve it ONLY if it is your own snapgent extension (it will stay approved).\n"
         "  Type y and press Enter to allow it, or anything else to refuse.\n"
         "\n"
         "  Allow? [y/N] "

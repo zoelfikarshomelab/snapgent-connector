@@ -433,10 +433,10 @@ describe("writing and sending", () => {
       editor.innerHTML = event.clipboardData.getData("text/plain").split("\n").map((line) => `<p>${line}</p>`).join("");
     }, true);
     editor.addEventListener("paste", (event) => event.stopImmediatePropagation(), true);
-    const message = "⟦ZS-SYS⟧\nCONTEXT: snapgentV3 is a browser extension that sends your plain-text JSON commands";
+    const message = "⟦ZS-SYS⟧\nCONTEXT: snapgent is a browser extension that sends your plain-text JSON commands";
     document_submit(editor, state);
     await provider.typeAndSend(message, []);
-    assert.deepEqual(state.sent, ["⟦ZS-SYS⟧CONTEXT: snapgentV3 is a browser extension that sends your plain-text JSON commands"]);
+    assert.deepEqual(state.sent, ["⟦ZS-SYS⟧CONTEXT: snapgent is a browser extension that sends your plain-text JSON commands"]);
     window.close();
   });
 

@@ -1,7 +1,7 @@
 <div align="center">
 
 <a href="https://github.com/zoelfikarshomelab/snapgent-connector">
-<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=800&size=52&duration=3000&pause=1000&color=FACC15&center=true&vCenter=true&width=700&height=90&lines=snapgentV3;+Connector+agent+MCP" alt="snapgentV3: Connector agent for VS Code" />
+<img src="https://readme-typing-svg.demolab.com?font=JetBrains+Mono&weight=800&size=52&duration=3000&pause=1000&color=FACC15&center=true&vCenter=true&width=700&height=90&lines=snapgent;+Connector+agent+MCP" alt="snapgent: Connector agent for VS Code" />
 </a>
 
 <p><b>Turn any AI chatbot browser to many app via MCP</b></p>
@@ -34,9 +34,9 @@
   > no API key · no terminal · no copy-paste
 ```
 
-snapgentV3 is a browser extension plus a local bridge that connects a normal AI chat to **VS Code**. It automatically uses the currently open workspace. Describe what you want in plain language — the extension forwards commands to the selected server through the local bridge, and returns the results to chat.
+snapgent is a browser extension plus a local bridge that connects a normal AI chat to **VS Code**. It automatically uses the currently open workspace. Describe what you want in plain language — the extension forwards commands to the selected server through the local bridge, and returns the results to chat.
 
-**Free and open source — no API key, subscription, or sign-in required.** snapgentV3 automatically uses the currently open VS Code workspace.
+**Free and open source — no API key, subscription, or sign-in required.** snapgent automatically uses the currently open VS Code workspace.
 
 ---
 
@@ -64,13 +64,13 @@ The default target. Automatically connects to the workspace currently open in VS
 
 ```
 ┌─────────────┐     plain-text      ┌──────────────────┐    WebSocket    ┌────────────┐    MCP    ┌────────────────┐
-│  AI chat    │ ───  commands  ───▶ │ snapgentV3       │ ──────────────▶ │  Bridge    │ ────────▶ │ Selected MCP   │
+│  AI chat    │ ───  commands  ───▶ │ snapgent       │ ──────────────▶ │  Bridge    │ ────────▶ │ Selected MCP   │
 │  (browser)  │ ◀──  results   ───  │ browser extension│ ◀────────────── │ (local)    │ ◀──────── │ target         │
 └─────────────┘                     └──────────────────┘                 └────────────┘           └────────────────┘
 ```
 
 1. **You** describe a task in a supported AI chat.
-2. The **AI** replies with a snapgentV3 command.
+2. The **AI** replies with a snapgent command.
 3. The **extension** detects the command and forwards it to the local bridge.
 4. The **bridge** routes it to the Snapgent MCP server.
 5. The **result** is sent back into chat, and the AI continues working.
@@ -113,11 +113,11 @@ VS Code's MCP server is configured by `snapgent` itself; it detects the open VS 
 
 **① Load the extension**
 
-1. Download and extract the [latest SnapgentV3 release](https://github.com/zoelfikarshomelab/snapgent-connector/releases/tag/V3.9.4).
+1. Download and extract the [latest Snapgent release](https://github.com/zoelfikarshomelab/snapgent-connector/releases/tag/V3.9.4).
 2. Open `edge://extensions` (Edge) or `chrome://extensions` (Chrome).
 3. Enable **Developer mode**.
 4. Click **Load unpacked** and select the `chrome` folder of the release (or `extension/dist/chrome` if you built from source).
-5. The snapgentV3 icon appears in your browser toolbar.
+5. The snapgent icon appears in your browser toolbar.
 
 **Firefox (128+):** open `about:debugging` → *This Firefox* → *Load Temporary Add-on* and pick `manifest.json` from the `firefox` folder
 (or `extension/dist/firefox`). Firefox may ask you to grant the site permissions from the extension's *Permissions* tab.
@@ -151,13 +151,13 @@ The extension comes as `snapgent-extension-v<version>.zip` (`chrome/` and `firef
 
       moz-extension://1f2e3d4c-...
 
-  Approve it ONLY if it is your own snapgentV3 extension (it will stay approved).
+  Approve it ONLY if it is your own snapgent extension (it will stay approved).
   Type y and press Enter to allow it, or anything else to refuse.
 
   Allow? [y/N]
 ```
 
-Type `y` only for your own snapgentV3 extension. The question is answered in **the same terminal** where
+Type `y` only for your own snapgent extension. The question is answered in **the same terminal** where
 you started the bridge, not in the browser; until you press Enter the extension keeps retrying and the popup
 says *Approve in the bridge terminal*. The answer is remembered in `trusted_origins.json` (so a
 different extension installed in your browser cannot drive your project). Without a terminal to ask in, pin
@@ -186,7 +186,7 @@ The extension and the bridge are two separate parts, and each one has to be upda
 2. Stop the old bridge: close the window or terminal that is running `snapgent`.
 3. Start `snapgent` again. It replaces an old bridge still holding port 17613. On Linux it first checks that the process on the port is a Snapgent bridge, and stops with an error if it belongs to another program.
 4. Reload the extension at `chrome://extensions` (or `edge://extensions`), then refresh open chat tabs (F5).
-5. Check the versions: click the snapgentV3 icon. The popup header shows `ext vX · bridge vY`, and both numbers should match the release you installed. The bridge also writes `snapgent bridge vY` to its startup log.
+5. Check the versions: click the snapgent icon. The popup header shows `ext vX · bridge vY`, and both numbers should match the release you installed. The bridge also writes `snapgent bridge vY` to its startup log.
 
 If the popup shows `bridge old`, the bridge is still running old code: repeat steps 2 and 3.
 
@@ -200,14 +200,14 @@ Once a session is running, just talk to the AI normally:
 
 > "Add a search bar to the books page and wire it to the existing API."
 
-The AI sends commands, snapgentV3 runs them in the selected target (VS Code by default), and the results appear in chat. You can give the AI another instruction at any time.
+The AI sends commands, snapgent runs them in the selected target (VS Code by default), and the results appear in chat. You can give the AI another instruction at any time.
 
 **Tips**
 
 - Keep the bridge window open — closing it disconnects the agent.
 - Keep your intended project open in VS Code; it is the default MCP target.
 - On **Arena**, use **Direct** mode.
-- If **Gemini** or **Kimi** stops using tools in a long session, remind it to use the snapgentV3 commands or start a new chat.
+- If **Gemini** or **Kimi** stops using tools in a long session, remind it to use the snapgent commands or start a new chat.
 
 ---
 
@@ -292,10 +292,10 @@ The dialog keeps the dangerous one-liners visible to you.
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| snapgentV3 bar is missing | Extension is disabled or site access is blocked | Check the extension is enabled and allowed on the current AI chat site, then reload the tab |
+| snapgent bar is missing | Extension is disabled or site access is blocked | Check the extension is enabled and allowed on the current AI chat site, then reload the tab |
 | Bridge is offline | Bridge is not running | Start `snapgent.exe` (Windows), `./snapgent` (Linux) or `python3 server/snapgent.py` (macOS) |
 | Popup says *Approve in the bridge terminal* | This extension has not been approved yet | Answer `y` in the terminal running the bridge (only if it is your own extension); to reset, delete `trusted_origins.json` |
-| AI replies without using tools | Provider/model stopped following commands | Remind it to use snapgentV3 commands or start a new chat |
+| AI replies without using tools | Provider/model stopped following commands | Remind it to use snapgent commands or start a new chat |
 | VS Code target is unavailable | The bridge is offline or the release is incomplete | Start `snapgent` and keep the project open in VS Code |
 | A configured MCP server is missing from the target dropdown | The server was switched off in the **MCP servers** panel, or the extension is outdated | Open **MCP servers** from the ⋯ menu on the snapgent bar and tick the server, then reload the extension in `chrome://extensions` and refresh the chat tab |
 | Target dropdown closes or the click does nothing | Older extension versions redrew the menu during status updates | Update to the latest release and reload the extension |

@@ -38,7 +38,7 @@ export function renderCommandList({ name, target, asked = "", enabled, tools }) 
   // Only the selected server can be listed. Asking for any other gets a generic
   // refusal that does not reveal whether that server exists or is connected.
   if (asked && asked !== target) {
-    return out(`ERROR: server "${asked}" is not available. Only the selected target "${target}" can be used in this session. Do NOT try other servers; ask the user to switch the target in the snapgentV3 selector if needed.`);
+    return out(`ERROR: server "${asked}" is not available. Only the selected target "${target}" can be used in this session. Do NOT try other servers; ask the user to switch the target in the snapgent selector if needed.`);
   }
   if (!enabled) {
     return out(`ERROR: MCP server "${target}" is disabled by the user. Do NOT use it. Tell the user to enable it in the MCP settings if it is needed.`);
@@ -46,7 +46,7 @@ export function renderCommandList({ name, target, asked = "", enabled, tools }) 
   if (!tools.length) return out("No commands available - the bridge or selected MCP server may be offline.");
   const scoped = tools.filter((tool) => serverOf(tool) === target);
   if (!scoped.length) {
-    return out(`ERROR: the selected server "${target}" has no commands available (it may be offline). Do NOT try other servers; tell the user to check the target in the snapgentV3 selector.`);
+    return out(`ERROR: the selected server "${target}" has no commands available (it may be offline). Do NOT try other servers; tell the user to check the target in the snapgent selector.`);
   }
   return out(`${target} commands (${scoped.length}):\n\n${formatCatalogue(scoped)}`);
 }

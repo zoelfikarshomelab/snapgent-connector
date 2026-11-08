@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Whether the open conversation is a snapgentV3 session, and what to do when the user moves to another
+// Whether the open conversation is a snapgent session, and what to do when the user moves to another
 // conversation while a bootstrap or a loop is still bound to the old one.
 //
 // Sites virtualize their message lists, so the system-prompt turn is dropped from the DOM once it scrolls

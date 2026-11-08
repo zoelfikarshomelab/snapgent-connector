@@ -133,4 +133,4 @@ jobs:
           flags=""
           case "$GITHUB_REF_NAME" in *-*) flags="--prerelease";; esac
           gh release create "$GITHUB_REF_NAME" "out/snapgent.exe" "out/snapgent-extension-v$v.zip" "out/snapgent-linux-x64-v$v.tar.gz" \
-            --title "snapgentV3 ${GITHUB_REF_NAME}" --notes-file CHANGELOG.md --verify-tag $flags
+            --title "snapgent ${GITHUB_REF_NAME}" --notes-file CHANGELOG.md --verify-tag $flags

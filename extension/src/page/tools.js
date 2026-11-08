@@ -51,7 +51,7 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
     findTool: (bareName) => catalogue.active().find((tool) => bareToolName(tool.name) === bareName),
     callTool: (name, args, timeout) => send({ type: "call_tool", name, arguments: args, timeout }),
     diag,
-    log: (...args) => console.log("[snapgentV3]", ...args),
+    log: (...args) => console.log("[snapgent]", ...args),
   });
 
   // Which folder the user chose, as the server sees it (the prompt opens with its name).

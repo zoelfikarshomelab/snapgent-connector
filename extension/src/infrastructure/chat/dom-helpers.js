@@ -28,5 +28,5 @@ export function fileFromImage(img, index) {
   const mime = img.mimeType || "image/jpeg";
   const bytes = Uint8Array.from(atob(img.data), (c) => c.charCodeAt(0));
   const ext = (IMAGE_EXTENSIONS.find(([needle]) => mime.includes(needle)) || [, "jpg"])[1];
-  return new File([bytes], `snapgentV3_${Date.now()}_${index}.${ext}`, { type: mime });
+  return new File([bytes], `snapgent_${Date.now()}_${index}.${ext}`, { type: mime });
 }

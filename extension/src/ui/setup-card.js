@@ -33,7 +33,7 @@ export function createSetupCard({ document, githubUrl, onDismiss }) {
     card.id = "zs-setup";
     card.hidden = true;
     setHtml(card,
-      `<div id="zs-setup-head"><span id="zs-setup-logo">snapgentV3</span><span id="zs-setup-tag">Setup</span></div>` +
+      `<div id="zs-setup-head"><span id="zs-setup-logo">snapgent</span><span id="zs-setup-tag">Setup</span></div>` +
       `<div id="zs-setup-sub">${SETUP_STEPS.length} quick steps.</div>` +
       `<ol id="zs-setup-steps">${SETUP_STEPS.map((step) => `<li>${step}</li>`).join("")}</ol>` +
       `<div class="zs-setup-copy-row"><input type="text" id="zs-setup-link" readonly value="${escapeHtml(githubUrl)}"><button id="zs-setup-copy">Copy</button></div>` +

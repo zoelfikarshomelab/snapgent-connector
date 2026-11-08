@@ -13,11 +13,11 @@ export const FEEDBACK = {
   parseError: (reason) => {
     const notes = {
       malformed:
-        "ERROR: a snapgentV3 command was detected in your reply but its JSON could not be parsed. " +
+        "ERROR: a snapgent command was detected in your reply but its JSON could not be parsed. " +
         'Rewrite it as a single valid JSON object in plain text, exactly like {"command": "name", "params": {...}}. ' +
         "You may add a short note around it. Please retry.",
       unclosed:
-        "ERROR: your snapgentV3 command was cut off before it finished - the JSON object " +
+        "ERROR: your snapgent command was cut off before it finished - the JSON object " +
         "never closed, so it could not run. Rewrite the WHOLE command in one " +
         'piece as valid JSON, exactly like {"command": "name", "params": {...}}. Please retry.',
       envelope:
@@ -27,7 +27,7 @@ export const FEEDBACK = {
         '"params". Please retry.',
       // The model named a REAL tool but under the wrong key - it wrote the call
       // the way a function-calling API would (e.g. {"toolName": "read_file",
-      // "file": "..."}) instead of snapgentV3's envelope. Seen live on
+      // "file": "..."}) instead of snapgent's envelope. Seen live on
       // ChatGPT in a long session. Naming the wrong keys explicitly matters: a
       // generic "bad JSON" note made the model rewrite the SAME shape.
       toolKey:
@@ -41,7 +41,7 @@ export const FEEDBACK = {
       // detector and loop the error forever. Describe it, don't reproduce it.
       dsml:
         "ERROR: you wrote that call in your own internal tool-call markup (the DSML invoke/parameter " +
-        "tags). snapgentV3 cannot read that format, so the command did not run. Never use those tags " +
+        "tags). snapgent cannot read that format, so the command did not run. Never use those tags " +
         "here. Write the call as a single plain-text JSON object instead, exactly like " +
         '{"command": "name", "params": { ...your parameters... }}. ' +
         "Please retry.",
@@ -52,7 +52,7 @@ export const FEEDBACK = {
   // never quotes it: a quoted marker in a user turn is echoed back by the model.
   nativeFormat:
     "\n\n(System note: the commands above were written in your own internal tool-call markup. They were run this time, but do not " +
-    "use that markup or any internal tool of your own here. Call snapgentV3's general commands instead, as one plain-text JSON " +
+    "use that markup or any internal tool of your own here. Call snapgent's general commands instead, as one plain-text JSON " +
     'object: {"command": "name", "params": { ...your parameters... }}.)',
   // The editor has no folder open, so the server offers no commands. Said to the model instead of a list of no valid commands.
   workspaceClosed: (folder) =>
@@ -70,13 +70,13 @@ export const FEEDBACK = {
   // burns the whole conversation re-issuing commands that can never run. See
   // createExtensionBridge (src/page/extension-bridge.js).
   staleExtension:
-    "ERROR: the snapgentV3 extension was reloaded or updated while this page was open, so this " +
+    "ERROR: the snapgent extension was reloaded or updated while this page was open, so this " +
     "tab is running a version of it that no longer exists and NO command can reach the user's " +
     "machine from here. The bridge and the editor are NOT the problem - do not tell the user " +
     "to check them, and do not retry the command, because every retry will fail the same way. " +
     "Tell the user in one short sentence to RELOAD THIS PAGE (F5), then stop and wait.",
   bridgeOffline:
-    "ERROR: the local snapgentV3 bridge is unreachable, so no command could run. " +
+    "ERROR: the local snapgent bridge is unreachable, so no command could run. " +
     "This is an environment problem on the user's machine (the bridge is not " +
     "running), NOT your mistake. Tell the user in " +
     "one short sentence that the bridge is offline, then stop " +

@@ -17,7 +17,7 @@ export function compactTools(tools) {
 // A short, clearly-labelled reminder of the available commands, injected under
 // a tool result every so often so the model does not drift from the exact
 // command names over a long session. It is explicitly framed as an automatic
-// snapgentV3 reminder (NOT a user message and NOT a new command to run).
+// snapgent reminder (NOT a user message and NOT a new command to run).
 // `calls` is the effective Commands per reply, when known: the model drifts from
 // that limit just as easily as from the names, so the reminder restates it.
 export function toolsReminder(tools, targetName = "Snapgent MCP", serverId = DEFAULT_SERVER_ID, calls) {
@@ -26,7 +26,7 @@ export function toolsReminder(tools, targetName = "Snapgent MCP", serverId = DEF
     compactTools(tools);
   return (
     "\n\n────────────────────────────────\n" +
-    "(System note from snapgentV3 - this is an automatic REMINDER, not a request and not a new result. " +
+    "(System note from snapgent - this is an automatic REMINDER, not a request and not a new result. " +
     "Do NOT reply to it or run any command because of it; just keep it in mind for your next command.)\n" +
     `Reminder of the ${targetName} commands (use exact names and parameter keys; ` +
     "only this selected target is available in this session):\n" +

@@ -132,7 +132,7 @@ export function switchMenuHtml(sites, currentName) {
       ? `<div class="zs-site-opt zs-site-here">${label}<span class="zs-site-badge">active</span></div>`
       : `<button class="zs-site-opt" data-u="${escapeHtml(site.url)}">${label}<span class="zs-site-go">&rarr;</span></button>`;
   }).join("");
-  return `<div class="zs-menu-head"><span class="zs-menu-logo">snapgentV3</span></div>
+  return `<div class="zs-menu-head"><span class="zs-menu-logo">snapgent</span></div>
          <section class="zs-menu-sec">
            <div class="zs-sec-label"><span>Switch AI</span></div>
            <div class="zs-site-grid">${grid}</div>

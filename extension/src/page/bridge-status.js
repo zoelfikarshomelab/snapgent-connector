@@ -15,7 +15,7 @@ export function createBridgeStatus({ state, settings, tools, send, bar, diag }) 
     listRoot: (name, timeout) => send({ type: "call_tool", name, arguments: tools.workspace.withRoot({ path: ".", max_depth: 0 }), timeout }),
     isListTool: (name) => bareToolName(name) === "tree",
     onChange: () => bar().render(),
-    log: (...args) => console.warn("[snapgentV3]", ...args),
+    log: (...args) => console.warn("[snapgent]", ...args),
   });
 
   let poll = 0;

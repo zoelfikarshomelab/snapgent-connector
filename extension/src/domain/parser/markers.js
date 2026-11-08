@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Wire-format markers of a snapgentV3 command. Pure constants, shared by every
+// Wire-format markers of a snapgent command. Pure constants, shared by every
 // parser module so the format is defined in exactly one place.
 
 export const START_M = "###MCP_TOOL###";

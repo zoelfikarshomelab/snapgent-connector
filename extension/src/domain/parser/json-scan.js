@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// String-aware JSON scanning helpers. No knowledge of snapgentV3 commands.
+// String-aware JSON scanning helpers. No knowledge of snapgent commands.
 
 // String-aware matching-brace finder: index of the "}" that closes the "{" at
 // `start`, SKIPPING braces inside JSON string literals (escaped quotes handled).

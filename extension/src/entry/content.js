@@ -63,7 +63,7 @@ const accountImport = createAccountImport({ document, site: accountSite, send })
 // The terminal panel lives from page load on: it must be listening before the first command starts.
 const terminal = createTerminal({ document, diag, onChange: redraw });
 terminal.start();
-const serverDirectory = new ServerDirectory({ store: storage, liveServers: () => state.bridge.servers || [], onChange: redraw, log: (...args) => console.warn("[snapgentV3]", ...args) });
+const serverDirectory = new ServerDirectory({ store: storage, liveServers: () => state.bridge.servers || [], onChange: redraw, log: (...args) => console.warn("[snapgent]", ...args) });
 const visibility = createVisibility({ document, state, diag, onParkChange: redraw });
 // The budget before the tools: the system prompt tells the model the effective Commands per reply, so the tools need its `calls` getter.
 const budget = createMessageBudget({ storage, hostname: location.hostname, provider, diag });
@@ -118,4 +118,4 @@ try {
 } catch { /* no extension messaging here */ }
 resend.hydrate();
 settings.ready.then(bridgeStatus.start);
-console.log(`[snapgentV3] content script ready (provider: ${provider.id})`);
+console.log(`[snapgent] content script ready (provider: ${provider.id})`);

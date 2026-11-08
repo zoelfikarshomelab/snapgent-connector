@@ -32,7 +32,7 @@ export function createChoiceDialog({ document: doc = globalThis.document, shadow
     return new Promise((resolve) => {
       const host = doc.createElement("div");
       const shadow = host.attachShadow({ mode: shadowMode });
-      setHtml(shadow, `<style>${STYLE}</style><dialog aria-labelledby="t"><div class="body"><p class="eyebrow">snapgentV3</p><h2 id="t"></h2><p class="hint"></p></div>
+      setHtml(shadow, `<style>${STYLE}</style><dialog aria-labelledby="t"><div class="body"><p class="eyebrow">snapgent</p><h2 id="t"></h2><p class="hint"></p></div>
         <div class="opts"></div><div class="actions"><button class="cancel" type="button">Cancel</button></div></dialog>`);
       const dialog = shadow.querySelector("dialog");
       shadow.querySelector("h2").textContent = title;

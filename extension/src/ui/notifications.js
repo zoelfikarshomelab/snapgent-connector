@@ -54,7 +54,7 @@ export function createNotifications({ root, reload = () => globalThis.location.r
     const button = element("button", "zs-banner-reload", "Reload page");
     button.addEventListener("click", reload);
     actions.append(button);
-    el.append(element("div", "zs-banner-t", "⚠ Reload page"), element("div", "zs-banner-m", "snapgentV3 was updated. Reload this page to continue."), actions);
+    el.append(element("div", "zs-banner-t", "⚠ Reload page"), element("div", "zs-banner-m", "snapgent was updated. Reload this page to continue."), actions);
     root.appendChild(el);
     connectionAlert = el;
   }
@@ -69,7 +69,7 @@ export function createNotifications({ root, reload = () => globalThis.location.r
     close.addEventListener("click", () => { el.remove(); if (connectionAlert === el) connectionAlert = null; });
     actions.append(close);
     el.append(
-      element("div", "zs-banner-t", "⚠ snapgentV3 disconnected"),
+      element("div", "zs-banner-t", "⚠ snapgent disconnected"),
       element("div", "zs-banner-m", "Bridge stopped. Start the bridge again and keep your project open in your editor."),
       actions,
     );
