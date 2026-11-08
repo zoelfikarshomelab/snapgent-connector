@@ -15,6 +15,11 @@ const isObject = (value) => !!value && typeof value === "object" && !Array.isArr
 
 export const exportFileName = (site) => `snapgent-accounts-${site}.json`;
 
+/** What the user is told about an import, from the background's answer. */
+export const importMessage = (reply) => (reply.ok
+  ? `Imported ${reply.imported} login(s)${reply.skipped ? `; ${reply.skipped} could not be used` : ""}.`
+  : reply.error || "Could not import that file.");
+
 /** The text of an export file: every account of one site. The id is left out, it is made from the name again on import. */
 export function serializeAccounts(site, accounts, now = Date.now()) {
   const list = accounts.map(({ name, savedAt, cookies, storage }) => ({ name, savedAt: savedAt || null, cookies: cookies || [], storage: storage || {} }));

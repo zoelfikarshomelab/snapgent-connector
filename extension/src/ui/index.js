@@ -22,5 +22,6 @@ export { classesOf, feed, lineHtml, segmentHtml } from "./ansi.js";
 export { createCalibrationWizard } from "./calibration-wizard.js";
 export { createPicker } from "./picker.js";
 export { chooseTextFiles, downloadText } from "./file-transfer.js";
+export { openAccountsImport } from "./accounts-import.js";
 export { pillHtml } from "./pill.js";
 export { appendHtml, escapeHtml, setHtml } from "./html.js";

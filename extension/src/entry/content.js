@@ -4,6 +4,7 @@
 
 import { PartQueue, ServerDirectory } from "../application/index.js";
 import defaultCalibrations from "../../profiles/default-calibrations.json";
+import { createAccountImport } from "../page/account-import.js";
 import { createAccountScope } from "../page/account-scope.js";
 import { createAccountStorage } from "../page/account-storage.js";
 import { createAttachments } from "../page/attachments.js";
@@ -57,6 +58,8 @@ const accountSite = accountSiteFor(location.hostname);
 const accounts = createAccountScope({ storage, site: accountSite ? accountSite.id : "" });
 // The login keys a site keeps in localStorage (DeepSeek's token): the background reads and writes them through this, nothing else.
 const accountStorage = createAccountStorage({ area: window.localStorage, allowed: accountSite ? accountStorageOf(accountSite) : [] });
+// "Import logins" opens its file window here, on the page: a popup closes as soon as a file window takes its focus.
+const accountImport = createAccountImport({ document, site: accountSite, send });
 // The terminal panel lives from page load on: it must be listening before the first command starts.
 const terminal = createTerminal({ document, diag, onChange: redraw });
 terminal.start();
@@ -106,6 +109,7 @@ try {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message && message.type === "zs-account-storage-read") { sendResponse({ ok: true, values: accountStorage.read(message.keys) }); return undefined; }
     if (message && message.type === "zs-account-storage-write") { sendResponse({ ok: true, written: accountStorage.write(message.entries) }); return undefined; }
+    if (message && message.type === "zs-accounts-import") { sendResponse({ ok: accountImport.open() }); return undefined; }
     if (!message || message.type !== "zs-account-status") return undefined;
     sendResponse({ ok: true, supported: !!accountSite, account: accounts.id(), busy: !!(state.running || state.starting) });
     return undefined;

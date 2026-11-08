@@ -3,7 +3,7 @@ import { accountHostsOf, allHostnames, siteFor } from "../sites/registry.js";
 import { nameProblem } from "../domain/accounts/account.js";
 import { exportFileName } from "../domain/accounts/transfer.js";
 import { matchingTab } from "../application/account-tab.js";
-import { chooseTextFiles, downloadText } from "../ui/file-transfer.js";
+import { downloadText } from "../ui/file-transfer.js";
 
 const SUPPORTED_HOSTS = allHostnames();
 // const DEFAULT_AI_URL = "https://chat.deepseek.com/"; // DeepSeek hidden (disabled, not deleted)
@@ -59,6 +59,13 @@ function activeTab() {
 async function tabFor(entry) {
   const tab = await activeTab();
   return matchingTab(entry, tab ? [tab] : []);
+}
+
+/** What a tab's content script answers to `message`; `{}` when it cannot be reached (a page opened before the extension was reloaded). */
+function askTab(tabId, message) {
+  return new Promise((resolve) => {
+    try { chrome.tabs.sendMessage(tabId, message, (reply) => { void chrome.runtime.lastError; resolve(reply || {}); }); } catch { resolve({}); }
+  });
 }
 
 /** The registry entry of a tab, or null (a chrome:// page, an unsupported site, a missing url). */
@@ -120,9 +127,7 @@ async function activate(account) {
   try {
     const tab = await tabFor(accounts.entry);
     if (tab) {
-      const state = await new Promise((resolve) => {
-        try { chrome.tabs.sendMessage(tab.id, { type: "zs-account-status" }, (reply) => { void chrome.runtime.lastError; resolve(reply || {}); }); } catch { resolve({}); }
-      });
+      const state = await askTab(tab.id, { type: "zs-account-status" });
       if (state.busy) { say("The agent is running in this chat. Stop it (or wait) before switching logins.", "warn"); return; }
     }
     say(`Switching to ${account.name}…`);
@@ -200,12 +205,13 @@ $("acc-export").addEventListener("click", async () => {
   say(`Exported ${reply.count} login(s). The file holds live logins: keep it private.`, "ok");
 });
 
-$("acc-import").addEventListener("click", () => chooseTextFiles(document, {}, async ([text]) => {
-  const reply = await sendTo({ type: "accounts_import", site: accounts.site, hosts: accounts.hosts, text });
-  if (!reply.ok) { say(reply.error || "Could not import that file.", "bad"); return; }
-  say(`Imported ${reply.imported} login(s)${reply.skipped ? `; ${reply.skipped} could not be used` : ""}.`, reply.skipped ? "warn" : "ok");
-  await loadAccounts();
-}));
+// Import is done on the page, not here: a file window takes the popup's focus, the popup closes and its handler goes with it.
+$("acc-import").addEventListener("click", async () => {
+  const tab = await tabFor(accounts.entry);
+  if (!tab) { say("Open this site in the current tab first: the file window opens on its page.", "warn"); return; }
+  if (!(await askTab(tab.id, { type: "zs-accounts-import" })).ok) { say("This page does not answer. Reload it and try again.", "warn"); return; }
+  window.close();
+});
 
 $("user").addEventListener("click", () => { $("accounts").hidden = !$("accounts").hidden; });
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { FORMAT, VERSION, exportFileName, parseAccounts, serializeAccounts } from "../src/domain/accounts/transfer.js";
+import { FORMAT, VERSION, exportFileName, importMessage, parseAccounts, serializeAccounts } from "../src/domain/accounts/transfer.js";
 import { AccountStore } from "../src/application/account-store.js";
 import { AccountTransfer } from "../src/application/account-transfer.js";
 import { accountHostsOf, accountStorageOf, siteFor } from "../src/sites/registry.js";
@@ -62,6 +62,15 @@ describe("accounts as a file: what is written and what is taken back", () => {
     const result = parseAccounts(text, deepRules);
     assert.equal(result.ok, true);
     assert.deepEqual(result.accounts[0].storage, { userToken: "tok" });
+  });
+});
+
+describe("accounts as a file: what the user is told", () => {
+  test("an import says how many logins came in and how many could not be used, and a refusal says why", () => {
+    assert.equal(importMessage({ ok: true, imported: 2, skipped: 0 }), "Imported 2 login(s).");
+    assert.equal(importMessage({ ok: true, imported: 1, skipped: 3 }), "Imported 1 login(s); 3 could not be used.");
+    assert.equal(importMessage({ ok: false, error: "nope" }), "nope");
+    assert.equal(importMessage({ ok: false }), "Could not import that file.");
   });
 });
 
