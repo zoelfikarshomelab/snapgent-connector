@@ -92,6 +92,8 @@ export function createChat({ document, provider, state, visibility, catalogue, d
     turns: {
       next: (base) => watcher.wait(base),
       submit: async (text) => sender.submit(await outputFile.prepare(text)),
+      // The start message goes in as typed text, never as a file: a session is recognised later by its words on the page.
+      submitInline: (text) => sender.submit(text),
       isHalted: (item) => provider.turnHalted(item),
       resumeTruncated: async () => !!(provider.clickContinueBtn() && await waitFor(() => provider.isGenerating(), 2500)),
     },

@@ -98,7 +98,7 @@ export async function handleAccountMessage(msg) {
     switch (msg.type) {
       case "accounts_list": {
         const { active, accounts } = await store.list(msg.site);
-        return { ok: true, active, accounts: accounts.map(({ id, name, savedAt, cookies }) => ({ id, name, savedAt, cookies: (cookies || []).length })) };
+        return { ok: true, active, accounts: accounts.map(({ id, name, savedAt, switchedAt, cookies }) => ({ id, name, savedAt, switchedAt, cookies: (cookies || []).length })) };
       }
       case "accounts_capture":
         return switcherFor(msg.site, msg.hosts).capture(msg.site, msg.name);

@@ -68,7 +68,7 @@ export function createSession({ state, provider, tools, chat, bar, reminder, lim
     skills: tools.skills,
     workspace: tools.workspace,
     startMessage: ({ commands, tree, context }) => buildStartMessage({ prompt: tools.systemPrompt(), commands, tree, context }),
-    chat: chat.turns,
+    chat: { ...chat.turns, submit: chat.turns.submitInline || chat.turns.submit }, // the start message is typed, never attached as a file
     runner: tools.runner,
     initialContext: { limit },
     view: { toast: bar.toast, banner: bar.banner },

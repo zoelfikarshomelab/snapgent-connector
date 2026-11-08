@@ -57,7 +57,7 @@ describe("accounts: naming and the cookies of a login", () => {
 
   test("the summary the popup gets carries no cookie value", () => {
     const summary = accountSummary({ id: "work", name: "Work", savedAt: 5, cookies: [session] });
-    assert.deepEqual(summary, { id: "work", name: "Work", savedAt: 5, cookies: 1 });
+    assert.deepEqual(summary, { id: "work", name: "Work", savedAt: 5, switchedAt: null, cookies: 1 });
     assert.equal(JSON.stringify(summary).includes("sk-a"), false);
   });
 

@@ -35,11 +35,11 @@ describe("output as file: the message", () => {
     assert.equal(on.attached.length + off.attached.length, 0);
   });
 
-  test("the start message is never turned into a file", async () => {
+  test("a message that only quotes the session words (a tagged file that mentions them) still goes as a file", async () => {
     const { attached, output } = setup();
-    const start = `${SESSION_PHRASE} ${long}`;
-    assert.equal(await output.prepare(start), start);
-    assert.equal(attached.length, 0);
+    const quoting = `Attached files:\n${SESSION_PHRASE}\n${long}`;
+    assert.equal(await output.prepare(quoting), fileNote(quoting.length));
+    assert.equal(attached.length, 1);
   });
 
   test("when the page has no file input the message is cut to fit instead", async () => {

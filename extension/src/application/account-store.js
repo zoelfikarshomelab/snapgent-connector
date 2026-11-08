@@ -17,15 +17,23 @@ function siteEntry(entry) {
   return { active, accounts };
 }
 
-/** One account as it is kept, or null when its name cannot be used. A file may bring its own `savedAt`. */
-const entryOf = ({ name, cookies, storage, savedAt }) => (nameProblem(name) ? null : {
+/** One account as it is kept, or null when its name cannot be used. A file may bring its own `savedAt` and `switchedAt` (when the account became the one in use). */
+const entryOf = ({ name, cookies, storage, savedAt, switchedAt }) => (nameProblem(name) ? null : {
   id: accountId(name), name: String(name).trim(), savedAt: Number.isFinite(savedAt) ? savedAt : Date.now(), cookies: cookies || [], storage: storage || {},
+  ...(Number.isFinite(switchedAt) ? { switchedAt } : {}),
 });
 
+/** Saving over an account (the session in use captured again, a file imported) must not erase when it was switched to: the later of the two times stays. */
+function keepSwitchedAt(entry, existing) {
+  const times = [entry.switchedAt, existing && existing.switchedAt].filter(Number.isFinite);
+  return times.length ? { ...entry, switchedAt: Math.max(...times) } : entry;
+}
+
 export class AccountStore {
-  /** @param {{ store: { get: (key: string) => Promise<*>, set: (key: string, value: *) => Promise<void>|void } }} deps */
-  constructor({ store }) {
+  /** @param {{ store: { get: (key: string) => Promise<*>, set: (key: string, value: *) => Promise<void>|void }, now?: () => number }} deps `now` is the clock that stamps a switch (a test sets its own) */
+  constructor({ store, now = Date.now }) {
     this._store = store;
+    this._now = now;
   }
 
   async _all() {
@@ -64,7 +72,7 @@ export class AccountStore {
   /** Store several accounts with one write; a name already kept is replaced, one that cannot be used is left out. The account in use stays. */
   async saveAll(site, items) {
     const { active, accounts } = await this._site(site);
-    const added = Object.fromEntries(items.map((item) => entryOf(item)).filter(Boolean).map((entry) => [entry.id, entry]));
+    const added = Object.fromEntries(items.map((item) => entryOf(item)).filter(Boolean).map((entry) => [entry.id, keepSwitchedAt(entry, accounts[entry.id])]));
     await this._write(site, { active, accounts: { ...accounts, ...added } });
     return { ok: true, ids: Object.keys(added) };
   }
@@ -80,7 +88,10 @@ export class AccountStore {
   async setActive(site, id) {
     const { active, accounts } = await this._site(site);
     const next = id && accounts[id] ? id : null;
-    await this._write(site, { active: next, accounts });
+    // Only a CHANGE of account is a switch: writing the account in use back (a reload) keeps the time it was switched to.
+    const changed = !!next && next !== active;
+    const stamped = changed ? { ...accounts, [next]: { ...accounts[next], switchedAt: this._now() } } : accounts;
+    await this._write(site, { active: next, accounts: stamped });
     return { ok: true, active: next };
   }
 }

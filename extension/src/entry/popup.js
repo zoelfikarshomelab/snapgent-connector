@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { accountHostsOf, allHostnames, siteFor } from "../sites/registry.js";
-import { nameProblem } from "../domain/accounts/account.js";
+import { nameProblem, switchedLabel } from "../domain/accounts/account.js";
 import { exportFileName } from "../domain/accounts/transfer.js";
 import { matchingTab } from "../application/account-tab.js";
 import { downloadText } from "../ui/file-transfer.js";
@@ -89,7 +89,9 @@ function drawAccounts() {
     name.textContent = account.name;
     const meta = document.createElement("span");
     meta.className = "acc-meta";
-    meta.textContent = account.id === accounts.active ? "in use" : `${account.cookies} cookies`;
+    // What the user wants to know at a glance: which login has been in use since when, and so which one has probably spent its limit.
+    const inUse = account.id === accounts.active;
+    meta.textContent = [inUse ? "in use" : "", switchedLabel(account.switchedAt) || (inUse ? "" : `${account.cookies} cookies`)].filter(Boolean).join(" · ");
     const use = document.createElement("button");
     use.textContent = account.id === accounts.active ? "↻ Reload" : "Switch";
     use.disabled = accounts.busy; // the account in use can be reloaded: it is written back the same way

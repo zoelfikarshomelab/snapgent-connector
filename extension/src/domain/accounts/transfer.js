@@ -20,9 +20,9 @@ export const importMessage = (reply) => (reply.ok
   ? `Imported ${reply.imported} login(s)${reply.skipped ? `; ${reply.skipped} could not be used` : ""}.`
   : reply.error || "Could not import that file.");
 
-/** The text of an export file: every account of one site. The id is left out, it is made from the name again on import. */
+/** The text of an export file: every account of one site. The id is left out, it is made from the name again on import. `switchedAt` (when the account became the one in use) is optional, so files from before it existed still import. */
 export function serializeAccounts(site, accounts, now = Date.now()) {
-  const list = accounts.map(({ name, savedAt, cookies, storage }) => ({ name, savedAt: savedAt || null, cookies: cookies || [], storage: storage || {} }));
+  const list = accounts.map(({ name, savedAt, switchedAt, cookies, storage }) => ({ name, savedAt: savedAt || null, switchedAt: switchedAt || null, cookies: cookies || [], storage: storage || {} }));
   return JSON.stringify({ format: FORMAT, version: VERSION, site, exportedAt: now, accounts: list }, null, 2);
 }
 
@@ -41,7 +41,7 @@ function cleanAccount(item, { hosts, storageKeys }) {
   const cookies = (Array.isArray(item.cookies) ? item.cookies : []).map((cookie) => cleanCookie(cookie, hosts)).filter(Boolean);
   const storage = cleanStorage(item.storage, storageKeys);
   if (!cookies.length && !Object.keys(storage).length) return null;
-  return { name: item.name, savedAt: Number.isFinite(item.savedAt) ? item.savedAt : undefined, cookies, storage };
+  return { name: item.name, savedAt: Number.isFinite(item.savedAt) ? item.savedAt : undefined, switchedAt: Number.isFinite(item.switchedAt) ? item.switchedAt : undefined, cookies, storage };
 }
 
 /**

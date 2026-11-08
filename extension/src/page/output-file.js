@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // "Output as file": a message longer than the message size goes to the chat as a .txt file instead of in parts. The file is given to the
 // page through its file input, the same way the Preferences' test button does (provider.attachFile); the composer then only holds a short
-// note that points at it. Off by default, because not every AI reads attached files. The start message is never turned into a file: a
-// session is recognised by the words of that message on the page.
+// note that points at it. Off by default, because not every AI reads attached files. The start message never comes through here (see
+// `submitInline` in page/chat.js): a session is recognised by its words on the page. Nothing is decided by looking for those words in the
+// text, because a file the user tags may quote them too, and such a message would then be typed whole and refused by the site.
 
 import { trimMiddle } from "../domain/prompt/budget.js";
-import { SESSION_PHRASE } from "../domain/constants.js";
 
 export const FILE_NAME = "snapgent-message.txt";
 // The page shows the attachment a moment after the input fires; sending before that would send the note alone.
@@ -21,7 +21,7 @@ export function createOutputFile({ provider, budget = null, diag = () => {}, sle
     async prepare(text) {
       if (!budget || typeof budget.asFile !== "function" || !budget.asFile()) return text;
       const limit = budget.limit();
-      if (text.length <= limit || text.includes(SESSION_PHRASE) || typeof provider.attachFile !== "function") return text;
+      if (text.length <= limit || typeof provider.attachFile !== "function") return text;
       try {
         await provider.attachFile(makeFile(text), "input");
         await sleep(UPLOAD_WAIT_MS);

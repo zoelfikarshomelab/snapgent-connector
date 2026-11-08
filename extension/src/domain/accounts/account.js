@@ -59,5 +59,24 @@ export function cookieWriteSpec(cookie) {
 
 /** What the popup shows for one saved account, never the cookies themselves. */
 export const accountSummary = (account) => ({
-  id: account.id, name: account.name, savedAt: account.savedAt || null, cookies: (account.cookies || []).length,
+  id: account.id, name: account.name, savedAt: account.savedAt || null, switchedAt: account.switchedAt || null, cookies: (account.cookies || []).length,
 });
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const DAY_MS = 86400000;
+const pad = (number) => String(number).padStart(2, "0");
+const dayStart = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+
+/**
+ * When an account became the one in use, in the user's local time, e.g. "switched today 14:32 · 2h ago": enough to tell which login has
+ * been in use the longest, and so which one has probably spent its limit. Empty when there is no usable time.
+ */
+export function switchedLabel(at, now = Date.now()) {
+  if (!Number.isFinite(at)) return "";
+  const date = new Date(at);
+  const days = Math.round((dayStart(new Date(now)) - dayStart(date)) / DAY_MS);
+  const day = days === 0 ? "today" : days === 1 ? "yesterday" : `${date.getDate()} ${MONTHS[date.getMonth()]}`;
+  const minutes = Math.max(0, Math.floor((now - at) / 60000));
+  const ago = minutes < 1 ? "just now" : minutes < 60 ? `${minutes}m ago` : minutes < 48 * 60 ? `${Math.floor(minutes / 60)}h ago` : "";
+  return `switched ${day} ${pad(date.getHours())}:${pad(date.getMinutes())}${ago ? ` · ${ago}` : ""}`;
+}
