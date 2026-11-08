@@ -22,34 +22,61 @@ class ServerRegistry:
         self._log = log
         self.servers: Dict[str, MCPServer] = {}
         self.catalog: List[Dict[str, Any]] = []
+        # Servers added at run time (an SSH connection) rather than read from config.json: a restart for a config change keeps them.
+        self._attached: Dict[str, MCPServer] = {}
         # Where a server's own messages (a running command's live output) go; set by the bridge.
         self.on_notification: Optional[Callable[[Dict[str, Any]], None]] = None
 
     # ── lifecycle ──────────────────────────────────────────────────────────
 
     async def start_all(self, configs: Dict[str, Dict[str, Any]]) -> None:
-        self.servers = {server_id: self._factory(server_id, config) for server_id, config in configs.items()}
-        for server in self.servers.values():
+        configured = {server_id: self._factory(server_id, config) for server_id, config in configs.items() if server_id not in self._attached}
+        self.servers = {**configured, **self._attached}
+        for server in configured.values():
             if self.on_notification is not None:  # a server may be given its own listener (tests, custom stacks)
                 server.on_notification = self.on_notification
             await server.start()
         self.rebuild_catalog()
         self.log_health()
 
-    async def stop_all(self) -> None:
-        await asyncio.gather(*(server.stop() for server in self.servers.values()))
-        self.servers.clear()
-        self.catalog = []
+    async def stop_all(self, keep_attached: bool = False) -> None:
+        keep = self._attached if keep_attached else {}
+        await asyncio.gather(*(server.stop() for server_id, server in self.servers.items() if server_id not in keep))
+        self.servers = dict(keep)
+        if not keep_attached:
+            self._attached.clear()
+        self.rebuild_catalog()
 
     async def restart(self, configs: Dict[str, Dict[str, Any]]) -> None:
-        await self.stop_all()
+        await self.stop_all(keep_attached=True)
         await self.start_all(configs)
+
+    def attach(self, server_id: str, config: Dict[str, Any], label: Optional[str] = None) -> MCPServer:
+        """Add a server that is not in config.json (an SSH connection). It is not restarted on its own when it dies: what it needs
+        to come back (a passphrase) only the user can give."""
+        if server_id in self.servers:
+            raise ValueError(f"A server named {server_id} already exists.")
+        server = self._factory(server_id, config)
+        server.auto_revive = False
+        server.label = label
+        if self.on_notification is not None:
+            server.on_notification = self.on_notification
+        self.servers[server_id] = server
+        self._attached[server_id] = server
+        return server
+
+    async def detach(self, server_id: str) -> None:
+        server = self._attached.pop(server_id, None)
+        self.servers.pop(server_id, None)
+        if server is not None:
+            await server.stop()
+            self.rebuild_catalog()
 
     async def revive_dead(self) -> bool:
         """Restart any server whose process or reader died. True if anything was restarted."""
         revived = False
         for server in self.servers.values():
-            if not server.alive:
+            if not server.alive and getattr(server, "auto_revive", True):
                 self._log(f"[{server.server_id}] MCP server disconnected; restarting.")
                 await server.start()
                 revived = True
@@ -66,7 +93,8 @@ class ServerRegistry:
 
     def status(self) -> List[Dict[str, Any]]:
         return [
-            {"id": server.server_id, "alive": server.alive, "tools": len(server.tools) if server.alive else 0}
+            {"id": server.server_id, "alive": server.alive, "tools": len(server.tools) if server.alive else 0,
+             **({"remote": server.label} if getattr(server, "label", None) else {})}
             for server in self.servers.values()
         ]
 

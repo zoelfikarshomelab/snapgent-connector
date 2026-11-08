@@ -24,6 +24,7 @@ for (const target of targets) {
       content: join(root, "src/entry/content.js"),
       background: join(root, "src/entry/background.js"),
       popup: join(root, "src/entry/popup.js"),
+      "ssh-prompt": join(root, "src/entry/ssh-prompt.js"),
     },
     outdir: out,
     bundle: true,

@@ -3,6 +3,7 @@
 // Auto) and the workspace folder (VS Code's active window, one of its open folders, or any folder).
 
 import { isWorkspaceServer } from "../domain/agent/session-start.js";
+import { workspaceServerOf } from "../domain/ssh/server-id.js";
 import { APPROVAL_MODES, modeMenuHtml, setHtml, targetMenuHtml, workspaceLabel, workspaceMenuHtml } from "../ui/index.js";
 import { createPillMenu } from "./pill-menu.js";
 
@@ -11,8 +12,10 @@ import { createPillMenu } from "./pill-menu.js";
  *           confirm: object, catalogue: object, workspace: object, monitor: object, toast: (text: string) => void }} deps
  * @returns {{ sync: () => void }} redraw the pills from the current settings
  */
-export function createBarMenus({ document, root, group, settings, serverDirectory, send, confirm, catalogue, workspace, monitor, toast }) {
+export function createBarMenus({ document, root, group, settings, serverDirectory, send, confirm, catalogue, workspace, monitor, toast, ssh = null }) {
   const $ = (selector) => root.querySelector(selector);
+  // The SSH server the folder questions are for (none: this computer, which the default server answers).
+  const remote = () => workspaceServerOf(settings.target());
   const make = (button, menu, width, align, roomAbove, render) => createPillMenu({ document, button: $(button), menu: $(menu), group, width, align, roomAbove, render });
 
   // ── the MCP target ──
@@ -22,7 +25,9 @@ export function createBarMenus({ document, root, group, settings, serverDirector
     const key = `${settings.target()}|${options.map((option) => `${option.id}:${option.name}`).join("|")}`;
     if (menu.dataset.key === key && menu.childElementCount) return; // rewriting would destroy a button between mouse-down and mouse-up
     menu.dataset.key = key;
-    setHtml(menu, targetMenuHtml(options, settings.target()));
+    setHtml(menu, targetMenuHtml(options, settings.target(), { ssh: !!ssh }));
+    const sshOpen = menu.querySelector(".zs-ssh-open");
+    if (sshOpen) sshOpen.addEventListener("click", () => { targetMenu.close(); ssh.openDialog(); });
     menu.querySelectorAll(".zs-target-opt").forEach((button) => button.addEventListener("click", () => {
       targetMenu.close();
       if (button.dataset.id !== settings.target()) settings.selectTarget(button.dataset.id);
@@ -59,18 +64,18 @@ export function createBarMenus({ document, root, group, settings, serverDirector
     $("#zs-ws-btn").title = folder ? `This chat works in ${folder}` : "Auto: follows your active editor window";
   };
   const wsMenu = make("#zs-ws-btn", "#zs-ws-menu", 300, "right", 240, async () => {
-    const listing = await send({ type: "workspaces" });
+    const listing = await send({ type: "workspaces", server: remote() });
     if (!listing.ok) { toast(listing.error || "The bridge is not reachable."); return false; }
     pinned = listing.pinned;
     renderWorkspace();
-    fillWorkspaceMenu({ ...listing, pinned: workspace.bound() || listing.pinned });
+    fillWorkspaceMenu({ ...listing, pinned: workspace.bound() || listing.pinned, remote: !!remote() });
   });
   const wsError = (text) => { const el = $("#zs-ws-menu .zs-ws-error"); if (el) { el.textContent = text; el.hidden = !text; } };
 
   async function useWorkspace(path, { typed = false } = {}) {
     // A folder typed in may be anywhere on the machine: ask once before the agent may work in it.
     if (typed && !(await confirm.ask({ description: `Let the agent read and change files in this folder?\n${path}`, tool: "Workspace", risk: "write" }))) return;
-    const reply = await send({ type: "set_workspace", path });
+    const reply = await send({ type: "set_workspace", path, server: remote() });
     if (!reply.ok) { wsError(reply.error || "Could not use that folder."); return; }
     pinned = reply.pinned;
     workspace.bind(pinned || null); // a folder chosen here is the one THIS chat works in (Auto: it follows the server again)
@@ -93,6 +98,13 @@ export function createBarMenus({ document, root, group, settings, serverDirector
     for (const type of ["keydown", "keyup", "keypress", "input"]) input.addEventListener(type, (event) => event.stopPropagation());
     const pick = menu.querySelector(".zs-ws-pick");
     pick.addEventListener("click", async () => {
+      const server = remote();
+      if (server && ssh) {
+        wsError("");
+        const chosen = await ssh.browse(server);
+        if (chosen) useWorkspace(chosen, { typed: true }); // chosen in a window of the page, not of the system: asked once, like a typed path
+        return;
+      }
       const host = pick.querySelector(".zs-site-host");
       wsError("");
       pick.disabled = true;
@@ -111,7 +123,7 @@ export function createBarMenus({ document, root, group, settings, serverDirector
   }
 
   // The pill shows what is pinned right now (a bridge restart forgets it).
-  send({ type: "workspaces" }).then((listing) => { if (listing.ok) { pinned = listing.pinned; renderWorkspace(); } });
+  send({ type: "workspaces", server: remote() }).then((listing) => { if (listing.ok) { pinned = listing.pinned; renderWorkspace(); } });
   renderWorkspace();
 
   return {

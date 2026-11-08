@@ -4,13 +4,17 @@
 import { escapeHtml } from "./html.js";
 
 /** The MCP target pop-over: one row per option, the active one badged. */
-export function targetMenuHtml(options, currentId) {
+export function targetMenuHtml(options, currentId, { ssh = false } = {}) {
   const rows = options.map((option) => {
     const current = option.id === currentId;
     return `<button type="button" class="zs-site-opt zs-target-opt${current ? " zs-target-cur" : ""}" data-id="${escapeHtml(option.id)}">` +
       `<span class="zs-site-name"><span>${escapeHtml(option.name)}</span></span>${current ? `<span class="zs-site-badge">active</span>` : ""}</button>`;
   }).join("");
-  return `<section class="zs-menu-sec"><div class="zs-sec-label"><span>MCP target</span></div>${rows}</section>`;
+  // A server on another machine is reached over SSH: this row opens the dialog that connects to one.
+  const sshSection = ssh
+    ? `<section class="zs-menu-sec"><div class="zs-sec-label"><span>Over SSH</span></div><button type="button" class="zs-site-opt zs-ssh-open"><span class="zs-site-name"><span>Connect to a server…</span><span class="zs-site-host">its files and commands, not this computer's</span></span></button></section>`
+    : "";
+  return `<section class="zs-menu-sec"><div class="zs-sec-label"><span>MCP target</span></div>${rows}</section>${sshSection}`;
 }
 
 /** What the bar offers for approvals; `id` is what the VS Code server understands (see server/snapgent_mcp/security/modes.py). */
@@ -36,20 +40,20 @@ const folderName = (path) => String(path).replace(/[\\/]+$/, "").split(/[\\/]/).
  * The workspace pop-over: follow VS Code's active window (Auto), one of the folders VS Code has open, or any folder typed in.
  * @param {{ active: string|null, open: string[], pinned: string|null, recent?: string[] }} state  `recent`: folders used lately (from the bridge), shown after the open ones
  */
-export function workspaceMenuHtml({ active, open, pinned, recent = [] }) {
+export function workspaceMenuHtml({ active, open, pinned, recent = [], remote = false }) {
   const row = (path, title, note, current) =>
     `<button type="button" class="zs-site-opt zs-ws-opt${current ? " zs-target-cur" : ""}" data-path="${escapeHtml(path)}">` +
     `<span class="zs-site-name"><span>${escapeHtml(title)}</span><span class="zs-site-host">${escapeHtml(note)}</span></span>${current ? `<span class="zs-site-badge">in use</span>` : ""}</button>`;
-  const auto = row("", "Auto", active ? `follows your editor: ${folderName(active)}` : "follows your active editor window", !pinned);
+  const auto = remote ? "" : row("", "Auto", active ? `follows your editor: ${folderName(active)}` : "follows your active editor window", !pinned);
   const folders = open.map((path) => row(path, folderName(path), path, pinned === path)).join("");
   const typed = pinned && !open.includes(pinned) ? row(pinned, folderName(pinned), pinned, true) : "";
   // Folders used lately, so a chat can start in one when no editor has a folder open (the editor's own list comes first).
   const recentRows = recent.filter((path) => !open.includes(path) && path !== pinned).map((path) => row(path, folderName(path), path, false)).join("");
-  return `<section class="zs-menu-sec"><div class="zs-sec-label"><span>Workspace</span></div>${auto}</section>` +
-    (folders || typed ? `<section class="zs-menu-sec"><div class="zs-sec-label"><span>Open in your editor</span></div>${folders}${typed}</section>` : "") +
+  return (auto ? `<section class="zs-menu-sec"><div class="zs-sec-label"><span>Workspace</span></div>${auto}</section>` : "") +
+    (folders || typed ? `<section class="zs-menu-sec"><div class="zs-sec-label"><span>${remote ? "Open on the server" : "Open in your editor"}</span></div>${folders}${typed}</section>` : "") +
     (recentRows ? `<section class="zs-menu-sec"><div class="zs-sec-label"><span>Used lately</span></div>${recentRows}</section>` : "") +
-    `<section class="zs-menu-sec"><div class="zs-sec-label"><span>Another folder</span></div>` +
-    `<button type="button" class="zs-site-opt zs-ws-pick"><span class="zs-site-name"><span>Choose a folder…</span><span class="zs-site-host">opens your system's folder window</span></span></button>` +
+    `<section class="zs-menu-sec"><div class="zs-sec-label"><span>${remote ? "Folder on the server" : "Another folder"}</span></div>` +
+    `<button type="button" class="zs-site-opt zs-ws-pick"><span class="zs-site-name"><span>${remote ? "Browse the server's folders…" : "Choose a folder…"}</span><span class="zs-site-host">${remote ? "lists the folders on the SSH machine" : "opens your system's folder window"}</span></span></button>` +
     // The typed path is only the way out when this machine has no folder window.
     `<form class="zs-ws-form" hidden><input class="zs-ws-input" type="text" spellcheck="false" autocomplete="off" placeholder="/full/path/to/folder" aria-label="Folder path">` +
     `<button type="submit" class="zs-ws-use">Use</button></form><div class="zs-ws-error" hidden></div></section>`;

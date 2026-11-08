@@ -6,7 +6,7 @@ import sys
 import threading
 from typing import Any, Callable, Dict, Optional, TextIO
 
-from . import SERVER_NAME, SERVER_VERSION, protocol
+from . import SERVER_NAME, SERVER_VERSION, browse, protocol
 from .context import Context
 from .jobs import CANCELLED_MESSAGE, JOB_ARGUMENT, JOB_OP_ARGUMENT, JobStore
 from .security import CONFIRM, DENY, MODE_ARGUMENT, RESERVED_ARGUMENT, ConfirmationStore, Policy, SessionState, decide, policy_for_call, policy_from_env
@@ -55,6 +55,8 @@ class McpServer:
             return self._workspace_reply(request_id, lambda: self._workspace.listing())
         if method == "snapgent/set_workspace":
             return self._workspace_reply(request_id, lambda: {"pinned": self._pin(params.get("path"))})
+        if method == "snapgent/list_dirs":
+            return self._workspace_reply(request_id, lambda: browse.list_dirs(params.get("path")))
         return protocol.error(request_id, protocol.METHOD_NOT_FOUND, f"Method not found: {method}")
 
     def _pin(self, path: Any) -> Optional[str]:

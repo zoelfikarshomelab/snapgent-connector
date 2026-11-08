@@ -45,6 +45,10 @@ def _owns_its_console() -> bool:
 
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
+    if argv[:1] == ["--askpass"]:
+        # What ssh runs when it needs a passphrase: the bridge answers it through the browser (snapgent_bridge/askpass.py).
+        from snapgent_bridge.askpass_helper import main as askpass_main
+        return askpass_main(argv[1:])
     if argv[:1] and argv[0] in (MCP_FLAG, *LEGACY_MCP_FLAGS):
         from snapgent_mcp.server import main as mcp_main
         mcp_main()

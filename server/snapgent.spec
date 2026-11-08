@@ -7,7 +7,9 @@ a = Analysis(
     ["snapgent.py"],
     pathex=[],
     binaries=[],
-    datas=[],
+    # The Snapgent MCP server's own source files: they are put on a server the user connects to over SSH (snapgent_bridge/ssh_bundle.py),
+    # and a packaged program has them only compiled.
+    datas=[("snapgent_mcp", "snapgent_mcp")],
     # `websockets` loads parts of itself lazily; collect everything so the frozen bridge can serve.
     hiddenimports=collect_submodules("snapgent_bridge") + collect_submodules("snapgent_mcp") + collect_submodules("websockets"),
     hookspath=[],

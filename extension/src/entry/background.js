@@ -9,6 +9,7 @@
 
 import { BRIDGE_PORT as PORT, allMatches } from "../sites/registry.js";
 import { handleAccountMessage } from "./background-accounts.js";
+import { PROMPT_PAGE, createSshPrompts, replyOf } from "./background-ssh.js";
 
 const BRIDGE_URL = `ws://127.0.0.1:${PORT}`;
 
@@ -43,6 +44,12 @@ let serversCache = [];
 let bridgeVersion = null;
 // The bridge closes with code 1008 and this reason until the user approves this extension in its window.
 let needsApproval = false;
+// The window where ssh's questions (a passphrase, a new host) are answered; the answer goes back to the bridge and is kept nowhere.
+const sshPrompts = createSshPrompts({
+  windows: chrome.windows,
+  pageUrl: chrome.runtime.getURL(PROMPT_PAGE),
+  answer: (id, value) => send({ type: "ssh_answer", prompt_id: id, answer: value }, 10000),
+});
 
 function log(...a) {
   console.log("[zs-bg]", ...a);
@@ -95,6 +102,7 @@ function connect() {
     bridgeVersion = null;
     stopHeartbeat();
     failAllPending("bridge connection closed");
+    sshPrompts.closeAll();
     broadcastStatus();
     scheduleReconnect();
   };
@@ -235,10 +243,17 @@ function handleBridgeMessage(msg) {
     resolvePending(msg.id, { ok: !!msg.ok, error: msg.error, restarting: !!msg.restarting });
     return;
   }
-  if (msg.type === "workspace") {
-    resolvePending(msg.id, msg.ok
-      ? { ok: true, active: msg.active || null, open: Array.isArray(msg.open) ? msg.open : [], pinned: msg.pinned || null, picked: msg.picked || null }
-      : { ok: false, error: msg.error });
+  if (msg.type === "workspace" || msg.type === "ssh") {
+    // Everything the bridge put in the answer goes on (`recent`, `dirs`, ...): picking the fields here lost `recent` for good.
+    resolvePending(msg.id, replyOf(msg));
+    return;
+  }
+  if (msg.type === "ssh_prompt") {
+    sshPrompts.show(msg).catch(() => {}); // a question that cannot be shown is answered as cancelled by the prompts themselves
+    return;
+  }
+  if (msg.type === "ssh_status") {
+    forwardStream({ ...msg, type: "zs-ssh-status" }); // the pages show how far a connection has got; they are pushed it like live output
     return;
   }
   if (msg.type === "tool_stream") {
@@ -287,12 +302,17 @@ function broadcastStatus() {
 }
 
 // ── messages from content.js / popup.js ─────────────────────────────────
-chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
   (async () => {
     // Saved logins live here, not in the page: only the background may touch a site's cookies.
     const account = await handleAccountMessage(msg);
     if (account !== undefined) {
       sendResponse(account);
+      return;
+    }
+    // The question window's own messages: believed only when they come from that window (see background-ssh.js).
+    if (sshPrompts.handles(msg)) {
+      sendResponse(await sshPrompts.handle(msg, sender));
       return;
     }
     switch (msg.type) {
@@ -320,13 +340,22 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
         break;
       }
       case "workspaces":
-        sendResponse(await send({ type: "workspaces" }, 15000));
+        sendResponse(await send({ type: "workspaces", server: msg.server }, 15000));
         break;
       case "pick_folder": // waits for the user to choose in the system's folder window
         sendResponse(await send({ type: "pick_folder" }, 11 * 60 * 1000));
         break;
       case "set_workspace":
-        sendResponse(await send({ type: "set_workspace", path: msg.path }, 15000));
+        sendResponse(await send({ type: "set_workspace", path: msg.path, server: msg.server }, 15000));
+        break;
+      case "ssh_connect": // waits for the person to answer ssh's questions, so it may take minutes
+        sendResponse(await send({ type: "ssh_connect", target: msg.target }, 5 * 60 * 1000));
+        break;
+      case "ssh_disconnect":
+        sendResponse(await send({ type: "ssh_disconnect", server: msg.server }, 15000));
+        break;
+      case "ssh_list_dirs":
+        sendResponse(await send({ type: "ssh_list_dirs", server: msg.server, path: msg.path }, 30000));
         break;
       case "restart_mcp": {
         const r = await send({ type: "restart_mcp" }, 30000);
@@ -357,6 +386,9 @@ chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   })();
   return true; // async sendResponse
 });
+
+// A question window closed without an answer counts as cancelled.
+try { chrome.windows.onRemoved.addListener((windowId) => sshPrompts.windowClosed(windowId)); } catch { /* no windows API here */ }
 
 // Wake/keepalive hooks.
 chrome.runtime.onStartup.addListener(connect);

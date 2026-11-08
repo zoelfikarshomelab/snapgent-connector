@@ -8,15 +8,20 @@ const REMEMBER_LIMIT = 300;
 
 /**
  * @param {{ storage: { get: (key: string) => Promise<*>, set: (key: string, value: *) => void },
- *           provider: { conversationKey: () => string }, accountKey?: () => string }} deps
+ *           provider: { conversationKey: () => string }, accountKey?: () => string, serverKey?: () => string }} deps
  *   `accountKey` is the login in use: the folders of a chat are kept per login, so a chat opened under one account does not
  *   inherit the folder another account's chat of the same URL worked in.
+ *   `serverKey` names the SSH server the chat works on ("" for this computer): a folder is a path on ONE machine, so this computer's folder
+ *   is never sent to a server, nor a server's folder used on this computer.
  */
-export function createWorkspaceBinding({ storage, provider, accountKey = () => "" }) {
+export function createWorkspaceBinding({ storage, provider, accountKey = () => "", serverKey = () => "" }) {
   const scopeKey = () => {
     const key = provider.conversationKey();
-    const account = key ? accountKey() : "";
-    return account ? `${account}::${key}` : key;
+    if (!key) return key;
+    const account = accountKey();
+    const scoped = account ? `${account}::${key}` : key;
+    const server = serverKey();
+    return server ? `${server}>>${scoped}` : scoped;
   };
   let roots = {};
   let pending = null; // chosen at the start, before the new chat has an id to keep it under

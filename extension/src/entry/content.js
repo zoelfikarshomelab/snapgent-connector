@@ -28,6 +28,7 @@ import { defaultPreferences } from "../infrastructure/calibration/defaults.js";
 import { createProvider } from "../page/provider.js";
 import { createSession } from "../page/session.js";
 import { createSettings } from "../page/settings.js";
+import { createSsh } from "../page/ssh.js";
 import { createState } from "../page/state.js";
 import { createStop } from "../page/stop.js";
 import { createStorage } from "../page/storage.js";
@@ -67,7 +68,9 @@ const serverDirectory = new ServerDirectory({ store: storage, liveServers: () =>
 const visibility = createVisibility({ document, state, diag, onParkChange: redraw });
 // The budget before the tools: the system prompt tells the model the effective Commands per reply, so the tools need its `calls` getter.
 const budget = createMessageBudget({ storage, hostname: location.hostname, provider, diag });
-const tools = createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner: notify, terminal, accountKey: accounts.id, calls: budget.calls });
+// The SSH connect dialog and folder browser, made below with the bar's toast: the tools reach it only when a chat starts on a server.
+let ssh;
+const tools = createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner: notify, terminal, accountKey: accounts.id, calls: budget.calls, browseRemote: (server) => ssh.browse(server) });
 terminal.setCancel((jobKey, name) => tools.runner.cancelJob(jobKey, name));
 terminal.setRunner((call, options) => tools.manual.run(call, options));
 terminal.setTools(() => tools.catalogue.active());
@@ -78,9 +81,10 @@ let session;
 let attachments;
 let agentMode;
 let replay;
+ssh = createSsh({ document, send, settings, state, toast: (text) => bar.toast(text) });
 const calibration = createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast: (text) => bar.toast(text), previewStartMessage: () => session?.previewStartMessage?.(), previewReminderMessage: async () => { await tools.catalogue.ensure(); return tools.catalogue.active().length ? tools.reminderText() : null; } });
 bar = createBar({
-  document, window, provider, state, settings, serverDirectory, tools, monitor: bridgeStatus.monitor, storage, preferences, send, calibration, terminal,
+  document, window, provider, state, settings, serverDirectory, tools, monitor: bridgeStatus.monitor, storage, preferences, send, calibration, terminal, ssh,
   files: { list: () => attachments.listFiles(), refresh: () => attachments.refresh(), insert: (paths) => attachments.insert(paths), canList: () => attachments.canList() },
   onStart: () => session.start(),
   onStop: () => stop.stopLoop(),

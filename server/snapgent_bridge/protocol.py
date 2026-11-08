@@ -69,6 +69,11 @@ def workspace_message(request_id: Any, ok: bool, data: Optional[Dict[str, Any]] 
     return message
 
 
+def ssh_message(request_id: Any, result: Dict[str, Any]) -> Dict[str, Any]:
+    """The answer to one of the extension's SSH requests; `result` holds `ok` and what went with it."""
+    return {"type": "ssh", "id": request_id, **result}
+
+
 # ── tool calls ─────────────────────────────────────────────────────────────
 
 class ToolCall(NamedTuple):

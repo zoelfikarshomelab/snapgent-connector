@@ -9,6 +9,8 @@ import { toolsReminder } from "../domain/prompt/reminder.js";
 import { withoutResultHeader } from "../domain/tools/result-marker.js";
 import { ROOT_ARGUMENT } from "../domain/tools/confirmation.js";
 import { createChoiceDialog, createConfirmDialog } from "../ui/index.js";
+import { chooseRemoteWorkspace } from "../application/remote-workspace.js";
+import { workspaceServerOf } from "../domain/ssh/server-id.js";
 import { createWorkspaceBinding } from "./workspace-binding.js";
 
 /**
@@ -16,7 +18,7 @@ import { createWorkspaceBinding } from "./workspace-binding.js";
  *           storage: object, diag: Function, banner: Function, terminal?: object, accountKey?: () => string, calls?: () => number }} deps  `banner(level, title, text)`
  *   shows the user a notice; `terminal` receives the live output of commands (see page/terminal.js); `calls` reads the effective Commands per reply (general preference, or this site's own)
  */
-export function createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner, terminal = null, accountKey = () => "", calls = null }) {
+export function createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner, terminal = null, accountKey = () => "", calls = null, browseRemote = async () => null }) {
   const bridge = {
     listTools: () => send({ type: "list_tools" }),
     callTool: (request) => send({ type: "call_tool", ...request }),
@@ -40,7 +42,8 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
   const catalogue = new ToolCatalogue({ bridge, session, diag });
   // Risky actions need the user's approval: a top-layer dialog in a closed shadow root that ignores synthetic clicks.
   const confirm = createConfirmDialog();
-  const bindings = createWorkspaceBinding({ storage, provider, accountKey });
+  // A chat's folder is a path on one machine: the folder of this computer is never sent to an SSH server (and the other way round).
+  const bindings = createWorkspaceBinding({ storage, provider, accountKey, serverKey: () => workspaceServerOf(settings.target()) || "" });
   const choice = createChoiceDialog();
   const runner = new ToolRunner({ bridge, catalogue, session, visibility, sink, confirm, approvalMode: settings.approvalMode, workspaceRoot: bindings.current });
   // Commands the user types into the terminal run apart from the agent loop: a Stop that ended the loop leaves
@@ -75,7 +78,11 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
      * user's pick when VS Code has several open. `{ path }`, or `{ none }` (nothing open), `{ cancelled }`, `{ error }`.
      */
     async choose() {
-      const picked = await chooseWorkspace(await send({ type: "workspaces" }), (open) => choice.choose({
+      const server = workspaceServerOf(settings.target());
+      const listing = await send({ type: "workspaces", server });
+      // A server over SSH has no editor with a folder open: when nothing is chosen there yet, the person browses its folders.
+      if (server && listing.ok && !listing.pinned && !(listing.open || []).length) return chooseRemoteWorkspace({ server, browse: browseRemote, confirm, send, setPending: bindings.setPending });
+      const picked = await chooseWorkspace(listing, (open) => choice.choose({
         title: "Which folder should this chat work in?", hint: "Your editor has more than one folder open. This chat stays in the one you choose, whichever window you use later.", options: open,
       }));
       if (picked.path) bindings.setPending(picked.path);

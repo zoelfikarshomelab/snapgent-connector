@@ -14,6 +14,7 @@ from .protocol import error_message, json_line
 from .registry import ServerRegistry
 from .router import RequestRouter
 from .security import origin_allowed, request_origin
+from .ssh_manager import SshManager
 from .trust import TrustPolicy, TrustStore, ask_in_terminal
 
 try:
@@ -39,7 +40,9 @@ class BridgeServer:
         self._trust = trust or TrustPolicy(TrustStore(None), settings.pinned_origins(), ask_in_terminal, log_fn)
         self.clients = set()
         self._lock_: Optional[asyncio.Lock] = None
-        self.router = RequestRouter(registry, config, self.broadcast, BRIDGE_VERSION, log_fn)
+        # The SSH servers the user connects from the browser join the registry while the bridge runs (and are never written to config.json).
+        self.ssh = SshManager(registry, self.broadcast, self._announce, log_fn)
+        self.router = RequestRouter(registry, config, self.broadcast, BRIDGE_VERSION, log_fn, ssh=self.ssh)
         # A running command's live output comes from the MCP server as a notification: forward it to the extension.
         self.registry.on_notification = self._mcp_notification
 
@@ -50,10 +53,14 @@ class BridgeServer:
             self._lock_ = asyncio.Lock()
         return self._lock_
 
+    async def _announce(self) -> None:
+        await self.broadcast(self.router.connected_message())
+
     async def start_servers(self) -> None:
         await self.registry.start_all(self.config.load_servers())
 
     async def stop_servers(self) -> None:
+        await self.ssh.shutdown()
         await self.registry.stop_all()
 
     async def _send(self, client: Any, message: Dict[str, Any]) -> None:
@@ -141,7 +148,8 @@ class BridgeServer:
         """Restart MCP servers that died, and tell the extension when the catalogue changed."""
         while True:
             await asyncio.sleep(settings.MONITOR_INTERVAL_SECONDS)
-            if await self.registry.revive_dead():
+            ended = await self.ssh.reap()  # an SSH server whose connection ended is not restarted by itself: it needs the user
+            if await self.registry.revive_dead() or ended:
                 await self.broadcast(self.router.connected_message())
 
 

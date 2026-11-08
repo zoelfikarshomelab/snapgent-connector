@@ -30,7 +30,7 @@ function render(s) {
     : `ext v${extVer} · bridge old`;
   tools.textContent = s.connected ? `${s.tools || 0} tools` : s.needsApproval ? "Answer the question in the bridge terminal" : "Start the bridge";
   servers.textContent = s.connected
-    ? list.map((x) => `${x.alive ? "●" : "○"} ${x.id} (${x.alive ? x.tools + " tools" : "down"})`).join("\n")
+    ? list.map((x) => `${x.alive ? "●" : "○"} ${x.remote || x.id} (${x.alive ? x.tools + " tools" : "down"})`).join("\n")
     : "";
 }
 

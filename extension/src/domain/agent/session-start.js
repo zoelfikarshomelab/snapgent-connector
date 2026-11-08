@@ -3,6 +3,7 @@
 
 import { bareToolName } from "../tools/names.js";
 import { DEFAULT_SERVER_ID } from "../tools/default-server.js";
+import { isSshServerId } from "../ssh/server-id.js";
 
 // No folder at all: the editor has none open and this chat has none yet. The bar's folder menu is always a way to pick one.
 const WORKSPACE_REQUIRED = Object.freeze({ title: "Workspace required", text: "Open a project folder in your editor, or choose the folder for this chat in the bar's folder menu, then try again." });
@@ -14,9 +15,13 @@ export const WORKSPACE_PROBE_TOOL = "tree";
 /** Tools that only a folder-aware server (VS Code and its forks) advertises: their presence is the tell. */
 const WORKSPACE_TOOLS = ["tree", "list_dir", "list_commands"];
 
-/** Whether this target works in a folder: VS Code, or any server that advertises a folder tool (an editor's fork, a remote). */
+/**
+ * Whether this target works in a folder: VS Code, a server reached over SSH, or any server that advertises a folder tool (an editor's fork).
+ * An SSH server is known by its id, not by its tools: before a chat starts the catalogue of tools has not been fetched for it yet, and the
+ * folder and approval pills must already be there to choose a folder.
+ */
 export function isWorkspaceServer(targetId, toolNames) {
-  if (targetId === DEFAULT_SERVER_ID) return true;
+  if (targetId === DEFAULT_SERVER_ID || isSshServerId(targetId)) return true;
   return (toolNames || []).some((name) => WORKSPACE_TOOLS.includes(bareToolName(name)));
 }
 

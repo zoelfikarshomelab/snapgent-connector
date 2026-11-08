@@ -138,9 +138,14 @@ export class ToolRunner {
     return approved ? null : declinedFeedback(confirmation.description);
   }
 
+  /** The default server, or any server that advertises a folder tool (an editor's fork, a server reached over SSH): the ones that take a job key and can end a command. */
+  _isWorkspaceTarget(target) {
+    return target === DEFAULT_SERVER_ID || this._catalogue.active().some((tool) => ["tree", "list_dir", "list_commands"].includes(bareToolName(tool.name)));
+  }
+
   /** Stop only abandons the wait: the command itself keeps running on the machine unless the server is told to end it. */
   _cancelJob(name, target, jobKey) {
-    if (!jobKey || target !== DEFAULT_SERVER_ID) return;
+    if (!jobKey || !this._isWorkspaceTarget(target)) return;
     const cancel = { [JOB_ARGUMENT]: jobKey, [JOB_OP_ARGUMENT]: "cancel", [MODE_ARGUMENT]: this._approvalMode() };
     Promise.resolve(this._bridge.callTool({ name, arguments: cancel, timeout: 5000, server: target })).catch(() => {});
   }

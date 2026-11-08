@@ -31,6 +31,9 @@ class MCPServer:
         self._start_lock_: Optional[asyncio.Lock] = None
         self.error: Optional[str] = None
         self.ready = False
+        # An SSH server is not restarted by the monitor (its connection needs the user), and says where it runs.
+        self.auto_revive = True
+        self.label: Optional[str] = None
 
     # Locks are made on first use, inside the running loop: Python 3.9 binds a Lock to the current loop when it is created.
     @property

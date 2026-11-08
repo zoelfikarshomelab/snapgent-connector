@@ -63,10 +63,11 @@ export class ServerDirectory {
     const cached = new Map(this._custom.map((server) => [server.id, server]));
     const merged = live.map((server) => {
       const known = cached.get(server.id);
-      return { id: server.id, name: (known && known.name) || server.id, command: known && known.command, alive: server.alive, tools: server.tools };
+      return { id: server.id, name: server.remote || (known && known.name) || server.id, command: known && known.command, alive: server.alive, tools: server.tools, ...(server.remote ? { remote: server.remote } : {}) };
     });
     // Self-heal: the cache did not know a server the bridge actually has.
-    const unknown = live.filter((server) => !cached.has(server.id));
+    // An SSH server lasts as long as its connection and is named by the bridge (`remote`): it is never kept in the cache of servers the user added.
+    const unknown = live.filter((server) => !cached.has(server.id) && !server.remote);
     if (unknown.length) {
       this._custom = [...this._custom, ...unknown.map((server) => ({ id: server.id, name: server.id }))];
       this._store.set(KEYS.custom, this._custom);

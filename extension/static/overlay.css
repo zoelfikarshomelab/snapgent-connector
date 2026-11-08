@@ -305,6 +305,25 @@ button.zs-site-opt:hover .zs-site-go { opacity: 1; transform: translateX(0); }
 .zs-mcp-pop-btn-block { width: 100%; flex: 1 1 auto; }
 .zs-mcp-pop-btn-small { flex: none; min-height: 0; padding: 5px 10px; font-size: 11px; border-radius: 7px; }
 .zs-mcp-pop-btn:disabled { opacity: 0.45; cursor: default; }
+
+/* SSH: the dialog that connects to a server, and the browser of a server's folders. */
+.zs-mcp-pop-card.zs-ssh-card { width: min(460px, calc(100vw - 24px)); }
+.zs-ssh-form { display: flex; gap: 8px; }
+.zs-ssh-input { flex: 1; min-width: 0; box-sizing: border-box; padding: 8px 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.14); background: rgba(255, 255, 255, 0.06); color: inherit; font: inherit; font-size: 13px; }
+.zs-ssh-go { flex: none; }
+.zs-ssh-status { min-height: 1.3em; font-size: 12px; line-height: 1.4; color: #a8a8b2; overflow-wrap: anywhere; }
+.zs-ssh-status[data-kind="ok"] { color: #6ee7a8; }
+.zs-ssh-status[data-kind="warn"] { color: #fbbf24; }
+.zs-ssh-status[data-kind="bad"] { color: #ff8a8a; }
+.zs-ssh-conn { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 0; font-size: 12px; overflow-wrap: anywhere; }
+.zs-ssh-path { padding: 6px 8px; border-radius: 6px; background: rgba(255, 255, 255, 0.06); font: 12px ui-monospace, Consolas, monospace; overflow-wrap: anywhere; }
+.zs-ssh-error { color: #ff8a8a; }
+.zs-ssh-dirs { max-height: 260px; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.zs-ssh-dir { text-align: left; padding: 6px 8px; border: 0; border-radius: 6px; background: transparent; color: inherit; font: 12px ui-monospace, Consolas, monospace; cursor: pointer; overflow-wrap: anywhere; }
+.zs-ssh-dir:hover { background: rgba(255, 255, 255, 0.09); }
+html.zs-light .zs-ssh-input, html.zs-light .zs-ssh-path { background: rgba(0, 0, 0, 0.05); border-color: rgba(0, 0, 0, 0.12); }
+html.zs-light .zs-ssh-dir:hover { background: rgba(0, 0, 0, 0.07); }
+html.zs-light .zs-ssh-status { color: #6b7280; }
 .zs-mcp-row-actions { display: flex; gap: 6px; flex: none; }
 .zs-mcp-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;

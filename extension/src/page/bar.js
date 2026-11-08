@@ -54,7 +54,7 @@ const TEMPLATE = `
  * @param {{ document: Document, window: Window, provider: object, state: object, settings: object, serverDirectory: object, tools: object,
  *           monitor: object, storage: object, preferences: object, send: Function, calibration: object, files: object, onStart: () => void, onStop: () => void }} deps
  */
-export function createBar({ document, window, provider, state, settings, serverDirectory, tools, monitor, storage, preferences, send, calibration, terminal, files, onStart, onStop, onPlay, onToggleMode, onAdopt }) {
+export function createBar({ document, window, provider, state, settings, serverDirectory, tools, monitor, storage, preferences, send, calibration, terminal, ssh = null, files, onStart, onStop, onPlay, onToggleMode, onAdopt }) {
   const root = document.createElement("div");
   root.id = "zs-root";
   const notifications = createNotifications({ root });
@@ -71,7 +71,7 @@ export function createBar({ document, window, provider, state, settings, serverD
   el.toggle.addEventListener("click", (event) => { event.stopPropagation(); barPrefs.set({ hidden: !prefs.hidden }); });
 
   const group = createMenuGroup();
-  const menus = createBarMenus({ document, root, group, settings, serverDirectory, send, confirm: tools.confirm, catalogue: tools.catalogue, workspace: tools.workspace, monitor, toast: notifications.toast });
+  const menus = createBarMenus({ document, root, group, settings, serverDirectory, send, confirm: tools.confirm, catalogue: tools.catalogue, workspace: tools.workspace, monitor, toast: notifications.toast, ssh });
   // Skills, MCP servers and Preferences live in their own buttons; the Files window opens the same Preferences dialog.
   const isWorkspaceTarget = () => isWorkspaceServer(settings.target(), tools.catalogue ? tools.catalogue.active().map((t) => t.name) : []);
   const barSettings = createBarSettings({
