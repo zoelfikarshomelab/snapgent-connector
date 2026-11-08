@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 import { accountHostsOf, allHostnames, siteFor } from "../sites/registry.js";
 import { nameProblem } from "../domain/accounts/account.js";
+import { exportFileName } from "../domain/accounts/transfer.js";
 import { matchingTab } from "../application/account-tab.js";
+import { chooseTextFiles, downloadText } from "../ui/file-transfer.js";
 
 const SUPPORTED_HOSTS = allHostnames();
 // const DEFAULT_AI_URL = "https://chat.deepseek.com/"; // DeepSeek hidden (disabled, not deleted)
@@ -188,6 +190,22 @@ $("acc-diag").addEventListener("click", async () => {
     ? reply.hosts.map((host) => `${host.host}\n  ${host.names.length ? host.names.join(", ") : "(no cookies)"}`).join("\n") + `\nsaved: ${accounts.list.map((a) => `${a.name} (${a.cookies})`).join(", ") || "none"}\nin use: ${accounts.active || "unknown"}\npage storage: ${(reply.storage || []).join(", ") || "(none)"}`
     : `Could not inspect: ${reply.error || "unknown error"}`;
 });
+
+// Logins as a file: every saved login of this site out, or the logins of such a file in. The file holds live cookies, so the text
+// only leaves the background when the user presses Export, and the popup says to keep the file private.
+$("acc-export").addEventListener("click", async () => {
+  const reply = await sendTo({ type: "accounts_export", site: accounts.site, hosts: accounts.hosts });
+  if (!reply.ok) { say(reply.error || "Could not export the logins.", "bad"); return; }
+  downloadText(document, reply.text, exportFileName(accounts.site));
+  say(`Exported ${reply.count} login(s). The file holds live logins: keep it private.`, "ok");
+});
+
+$("acc-import").addEventListener("click", () => chooseTextFiles(document, {}, async ([text]) => {
+  const reply = await sendTo({ type: "accounts_import", site: accounts.site, hosts: accounts.hosts, text });
+  if (!reply.ok) { say(reply.error || "Could not import that file.", "bad"); return; }
+  say(`Imported ${reply.imported} login(s)${reply.skipped ? `; ${reply.skipped} could not be used` : ""}.`, reply.skipped ? "warn" : "ok");
+  await loadAccounts();
+}));
 
 $("user").addEventListener("click", () => { $("accounts").hidden = !$("accounts").hidden; });
 

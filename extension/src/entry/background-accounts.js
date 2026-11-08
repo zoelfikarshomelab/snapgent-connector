@@ -4,6 +4,7 @@
 
 import { AccountStore } from "../application/account-store.js";
 import { AccountSwitcher } from "../application/account-switcher.js";
+import { AccountTransfer } from "../application/account-transfer.js";
 import { SITES, accountStorageOf } from "../sites/registry.js";
 
 // chrome.* answers through a callback in older Firefox builds and through a promise in Chrome: take whichever comes.
@@ -82,6 +83,8 @@ function switcherFor(site, hosts) {
 
 const missing = (msg) => (!msg.site || !Array.isArray(msg.hosts) || !msg.hosts.length ? { ok: false, error: "No site to keep accounts for." } : null);
 
+const transferFor = (msg, store) => new AccountTransfer({ store, hosts: msg.hosts, storageKeys: storageKeysOf(msg.site) });
+
 /**
  * Answer one `accounts_*` message, or return undefined when it is not one.
  * @param {{ type: string, site?: string, hosts?: string[], id?: string, name?: string }} msg
@@ -107,6 +110,11 @@ export async function handleAccountMessage(msg) {
       }
       case "accounts_remove":
         return store.remove(msg.site, msg.id);
+      // The one answer that carries cookie values to the popup: it is the file the user asked for, and the popup only downloads it.
+      case "accounts_export":
+        return transferFor(msg, store).exportText(msg.site);
+      case "accounts_import":
+        return transferFor(msg, store).importText(msg.site, msg.text);
       case "accounts_signout":
         return switcherFor(msg.site, msg.hosts).clear(msg.site);
       case "accounts_inspect":

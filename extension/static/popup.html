@@ -72,6 +72,7 @@
     .acc-actions { display: flex; gap: 6px; margin-top: 8px; }
     .acc-actions #acc-other { flex: 1; }
     .acc-actions #acc-diag { width: auto; flex: none; }
+    .acc-actions #acc-export, .acc-actions #acc-import { flex: 1; }
     #acc-diag-out { margin: 8px 0 0; font: 10.5px ui-monospace, monospace; line-height: 1.6; color: var(--muted); white-space: pre-wrap; word-break: break-word; }
     #acc-busy { margin: 6px 0 0; font-size: 11px; color: var(--accent); }
     h1 {
@@ -238,10 +239,14 @@
         <button type="button" id="acc-other">Sign in with another account</button>
         <button type="button" id="acc-diag" title="What the background can see, to diagnose a switch">?</button>
       </div>
+      <div class="acc-actions">
+        <button type="button" id="acc-export" title="Save every login of this site to a file">Export</button>
+        <button type="button" id="acc-import" title="Add the logins of an exported file">Import</button>
+      </div>
       <p id="acc-busy" hidden>Working…</p>
       <p id="acc-status"></p>
       <pre id="acc-diag-out" hidden></pre>
-      <p class="limit-note">Switching puts another saved login's cookies back, so the other account is never signed out. Only the page you are on is reloaded.</p>
+      <p class="limit-note">Switching puts another saved login's cookies back, so the other account is never signed out. Only the page you are on is reloaded. An export file holds live logins: keep it private.</p>
     </section>
 
     <div class="actions">

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Where the saved logins live: one object in extension storage, kept per site and per account. A login is sensitive, so this
-// is never exported, never synced, and removing an account removes its cookies. Reading never rejects: a page can outlive
+// is never synced, only written to a file when the user asks for an export, and removing an account removes its cookies.
+// Reading never rejects: a page can outlive
 // its extension (reload, update) and every call then throws.
 
 import { accountId, nameProblem } from "../domain/accounts/account.js";
@@ -15,6 +16,11 @@ function siteEntry(entry) {
   const active = isObject(entry) && typeof entry.active === "string" ? entry.active : null;
   return { active, accounts };
 }
+
+/** One account as it is kept, or null when its name cannot be used. A file may bring its own `savedAt`. */
+const entryOf = ({ name, cookies, storage, savedAt }) => (nameProblem(name) ? null : {
+  id: accountId(name), name: String(name).trim(), savedAt: Number.isFinite(savedAt) ? savedAt : Date.now(), cookies: cookies || [], storage: storage || {},
+});
 
 export class AccountStore {
   /** @param {{ store: { get: (key: string) => Promise<*>, set: (key: string, value: *) => Promise<void>|void } }} deps */
@@ -51,10 +57,16 @@ export class AccountStore {
   async save(site, name, cookies, storage = {}) {
     const problem = nameProblem(name);
     if (problem) return { ok: false, error: problem };
-    const id = accountId(name);
+    const { ids } = await this.saveAll(site, [{ name, cookies, storage }]);
+    return { ok: true, id: ids[0] };
+  }
+
+  /** Store several accounts with one write; a name already kept is replaced, one that cannot be used is left out. The account in use stays. */
+  async saveAll(site, items) {
     const { active, accounts } = await this._site(site);
-    await this._write(site, { active, accounts: { ...accounts, [id]: { id, name: String(name).trim(), savedAt: Date.now(), cookies, storage } } });
-    return { ok: true, id };
+    const added = Object.fromEntries(items.map((item) => entryOf(item)).filter(Boolean).map((entry) => [entry.id, entry]));
+    await this._write(site, { active, accounts: { ...accounts, ...added } });
+    return { ok: true, ids: Object.keys(added) };
   }
 
   /** Forget an account, and with it its cookies. An account in use is no longer marked as such. */

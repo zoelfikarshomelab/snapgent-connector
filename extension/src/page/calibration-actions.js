@@ -4,7 +4,7 @@
 
 import { ProfileStore } from "../application/index.js";
 import { SITE_LINKS, siteFor } from "../sites/registry.js";
-import { createCalibrationWizard, openCalibrationImport } from "../ui/index.js";
+import { createCalibrationWizard, openCalibrationImport, downloadText, chooseTextFiles } from "../ui/index.js";
 import { learnProfile, profileProblems, updateProfile, createCalibratedProvider } from "../infrastructure/calibration/index.js";
 import { describeElement } from "../infrastructure/chat/index.js";
 import { loremIpsum } from "../domain/prompt/lorem.js";
@@ -34,36 +34,20 @@ export function createCalibrationActions({ document, location, provider, state, 
   async function exportProfile() {
     const text = await store.exportText(location.hostname);
     if (!text) { toast("This site is not calibrated yet."); return; }
-    download(text, `snapgent-${location.hostname}.json`);
-  }
-
-  function download(text, name) {
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob([text], { type: "application/json" }));
-    link.download = name;
-    document.documentElement.appendChild(link);
-    link.click();
-    link.remove();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+    downloadText(document, text, `snapgent-${location.hostname}.json`);
   }
 
   /** Every calibration of every AI, in one file. */
   async function exportAll() {
     const text = await store.exportAllText();
     if (!text) { toast("Nothing is calibrated yet."); return; }
-    download(text, "snapgent-calibrations.json");
+    downloadText(document, text, "snapgent-calibrations.json");
   }
 
   /** Choose files, see what they hold per AI (in the order of the "switch AI" list), and take the ones ticked. */
   function importAll() {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "application/json,.json";
-    input.multiple = true;
-    input.addEventListener("change", async () => {
-      const files = [...(input.files || [])];
-      if (!files.length) return;
-      const { groups, skipped, preferences: filePrefs } = await store.read(await Promise.all(files.map((file) => file.text())));
+    chooseTextFiles(document, { multiple: true }, async (texts) => {
+      const { groups, skipped, preferences: filePrefs } = await store.read(texts);
       const order = (group) => { const at = SITE_LINKS.findIndex((site) => site.name === group.name); return at < 0 ? SITE_LINKS.length : at; };
       groups.sort((a, b) => order(a) - order(b) || a.name.localeCompare(b.name));
       openCalibrationImport({
@@ -75,20 +59,13 @@ export function createCalibrationActions({ document, location, provider, state, 
         },
       });
     });
-    input.click();
   }
 
   function importProfile() {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.accept = "application/json,.json";
-    input.addEventListener("change", async () => {
-      const file = input.files && input.files[0];
-      if (!file) return;
-      const result = await store.importText(await file.text(), location.hostname);
+    chooseTextFiles(document, {}, async ([text]) => {
+      const result = await store.importText(text, location.hostname);
       toast(result.ok ? "Calibration imported." : result.error);
     });
-    input.click();
   }
 
   /** This AI's message size and commands per reply, kept in its calibration; null goes back to the general preferences. */

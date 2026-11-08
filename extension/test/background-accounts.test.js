@@ -95,4 +95,18 @@ describe("accounts in the background worker", () => {
       assert.equal(JSON.stringify(saved.zsAccounts).includes("sk-a"), false, "the cookies are gone from storage too");
     });
   });
+
+  test("a login exported to a file comes back through an import, and a bad file is answered, not thrown", async () => {
+    await withChrome([session], async ({ handleAccountMessage, saved }) => {
+      assert.match((await handleAccountMessage(message("accounts_export"))).error, /No login is saved/);
+      await handleAccountMessage(message("accounts_capture", { name: "Work" }));
+      const exported = await handleAccountMessage(message("accounts_export"));
+      assert.deepEqual([exported.ok, exported.count], [true, 1]);
+      await handleAccountMessage(message("accounts_remove", { id: "work" }));
+      const imported = await handleAccountMessage(message("accounts_import", { text: exported.text }));
+      assert.deepEqual([imported.ok, imported.imported], [true, 1]);
+      assert.equal(saved.zsAccounts.claude.accounts.work.cookies[0].value, "sk-a");
+      assert.match((await handleAccountMessage(message("accounts_import", { text: "{nope" }))).error, /not valid JSON/);
+    });
+  });
 });
