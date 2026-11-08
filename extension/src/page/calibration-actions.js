@@ -148,6 +148,7 @@ export function createCalibrationActions({ document, location, provider, state, 
       lines.push(`profile: ${JSON.stringify(d.profile)}`, `health: ${JSON.stringify(d.health)}`,
         `chatIsEmpty=${d.chatIsEmpty} isFreshChat=${d.isFreshChat} key="${d.key}" turns: ${d.userCount} yours, ${d.assistantCount} AI`);
       for (const [label, el] of [["composer", d.composer], ["card", d.card], ["send", d.send]]) lines.push(`${label}: ${el ? `${rect(el)} ${chain(el)}` : "-"}`);
+      if (d.rawViews) lines.push(`json Tree/Raw toggles in the last reply: ${d.rawViews.pairs} found, ${d.rawViews.notShown} not on Raw`);
       for (const role of ["user", "assistant"]) {
         lines.push(`${role} matches (first 8):`);
         for (const m of d[role]) lines.push(`  ${m.shown ? "shown" : "hidden"} ${m.chars} chars ${rect(m.el)} ${chain(m.el)}`);

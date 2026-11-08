@@ -8,7 +8,7 @@ import { StreamSampler } from "../chat/stream-sampler.js";
 import { waitFor } from "../chat/wait.js";
 import { alternativeSelectors, shown, visible } from "./dom-signals.js";
 import { readText } from "./page-text.js";
-import { showRawViews } from "./raw-view.js";
+import { rawViewState, showRawViews } from "./raw-view.js";
 import { profileProblems } from "./profile.js";
 
 const TIMINGS = { GEN_IDLE_MS: 2000, REASON_IDLE_MS: 15000, WARMUP_MS: 60000, REASON_NOREPLY_MS: 120000, STABLE_MS: 10000, RESPONSE_TIMEOUT_MS: 300000 };
@@ -460,6 +460,7 @@ export function createCalibratedProvider({ document, location, profile, diag = (
         composer: getEditor(), card: composerFrame(), send: sendButton(),
         assistant: matches(profile.assistant.turn), user: matches(profile.user.turn),
         assistantCount: assistantCount(), userCount: userCount(),
+        rawViews: lastAssistant() ? rawViewState(lastAssistant()) : null,
       };
     },
     get needsCalibration() { return !health().ok; },
