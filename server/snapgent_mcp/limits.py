@@ -26,6 +26,16 @@ COMMAND_TIMEOUT_SECONDS = 120  # as long as the bridge waits for one tool call (
 SCRIPT_TIMEOUT_SECONDS = 300
 COMMIT_TIMEOUT_SECONDS = 120
 
+# A command still running when one call has to answer is not stopped: it goes on in the background and the call answers with what it
+# printed so far. The call answers BEFORE the extension and the bridge give up on it (they wait COMMAND_TIMEOUT_SECONDS), so what the
+# model gets back is an answer, never a timeout.
+FOREGROUND_SECONDS = 100
+WAIT_DEFAULT_SECONDS = 90       # wait_command: how long one call waits for a background command unless told otherwise
+WAIT_MAX_SECONDS = 100
+BACKGROUND_MAX_SECONDS = 3600   # a command still running after this long is stopped
+BACKGROUND_KEPT_SECONDS = 3600  # a finished background command (and its log file) is forgotten after this long
+MAX_BACKGROUND_RUNS = 5         # running at once; beyond that a command that takes too long is stopped, as it always was
+
 # Live command output: a running command reports what it prints while it runs (the terminal panel).
 STREAM_MAX_CHUNKS = 5_000      # live messages per command; past this the stream says so and goes quiet (the full output is still kept)
 STREAM_MAX_CHARS = 1_000_000   # live characters per command, same deal

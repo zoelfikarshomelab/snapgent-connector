@@ -43,7 +43,7 @@ class ServerTests(WorkspaceCase):
 
     def test_tools_are_listed_whether_or_not_an_editor_has_a_folder_open(self):
         # Each call carries the folder its chat works in, so the editor is not what makes a call possible.
-        self.assertEqual(len(self.ask("tools/list")["result"]["tools"]), 24)
+        self.assertEqual(len(self.ask("tools/list")["result"]["tools"]), 26)
         self.assertEqual(self.ask("tools/list", open_workspace=False)["result"]["tools"], self.ask("tools/list")["result"]["tools"])
 
     def test_notifications_get_no_reply(self):
