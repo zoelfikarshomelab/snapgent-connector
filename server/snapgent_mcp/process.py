@@ -14,6 +14,7 @@ from .jobs import CANCELLED_MESSAGE, current_job, stop_process
 from .limits import (BACKGROUND_MAX_SECONDS, COMMAND_OUTPUT_CHARS, COMMAND_TIMEOUT_SECONDS, FOREGROUND_SECONDS, MAX_OUTPUT_CHARS,
                      STREAM_MAX_CHARS, STREAM_MAX_CHUNKS)
 from .outputs import CACHE
+from .preview import is_long, preview
 
 # One live message never carries more than this (the WebSocket and the page stay small).
 CHUNK_MESSAGE_CHARS = 16_000
@@ -337,9 +338,12 @@ def run_process_streaming(command: List[str], cwd: Path, timeout: int = COMMAND_
     if state.run_id is not None:
         CACHE.set_output(state.run_id, output)
         CACHE.finish(state.run_id, process.returncode)
-    if len(output) > limit:
+    if len(output) > limit or is_long(output):
         run_id = state.run_id or CACHE.store(display, process.returncode, output)
-        output = compact(output, limit, run_id)
+        # The model gets the first and last lines only: a long log is mostly noise, and the whole of it stays one get_command_output away.
+        output = preview(output, run_id)
+        if len(output) > limit:  # a few enormous lines can still be too much
+            output = compact(output, limit, run_id)
     if process.returncode:
         raise RuntimeError(f"Command exited with status {process.returncode}:\n{output}")
     return output

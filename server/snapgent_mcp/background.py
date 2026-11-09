@@ -20,6 +20,7 @@ from typing import Any, Callable, Dict, Optional, Tuple
 from .jobs import stop_process
 from .limits import BACKGROUND_KEPT_SECONDS, BACKGROUND_MAX_SECONDS, MAX_BACKGROUND_RUNS, WAIT_DEFAULT_SECONDS
 from .outputs import CACHE
+from .preview import line_count, preview
 
 
 def duration(seconds: float) -> str:
@@ -183,9 +184,9 @@ def _commands(run_id: str) -> str:
 
 def handover_report(run: BackgroundRun, text: str, limit: int, window: float) -> str:
     """What the call that started the command answers when it had to stop waiting: the end of the output and how to go on from here."""
-    shown, omitted = tail(text, limit)
-    counted = f"Output so far: {len(text):,} characters"
-    counted += f"; the last {len(shown):,} are shown below ({omitted:,} earlier ones left out)." if omitted else "."
+    shown, omitted = tail(preview(text, run.run_id), limit)
+    counted = f"Output so far: {len(text):,} characters, {line_count(text):,} lines"
+    counted += f"; the last {len(shown):,} characters are shown below ({omitted:,} earlier ones left out)." if omitted else "."
     return "\n".join([
         f"⏳ Still running after {duration(window)}. The command was NOT stopped: it goes on in the background.",
         f"`{run.display}`  (run_id {run.run_id}, pid {run.pid})",
@@ -203,7 +204,7 @@ def handover_report(run: BackgroundRun, text: str, limit: int, window: float) ->
 
 def wait_report(run: BackgroundRun, new_text: str, limit: int) -> str:
     """The answer of wait_command. Raises when the command ended badly, so the model sees the failure it is."""
-    shown, omitted = tail(new_text, limit)
+    shown, omitted = tail(preview(new_text, run.run_id, numbered=False), limit)
     body = shown or "(no new output)"
     if omitted:
         body = f"[{omitted:,} earlier characters of the new output left out: get_command_output reads them]\n{body}"
