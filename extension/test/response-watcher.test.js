@@ -173,6 +173,37 @@ describe("ResponseWatcher: gates", () => {
   });
 });
 
+describe("ResponseWatcher: patient mode", () => {
+  const patient = (h) => new ResponseWatcher({ ...h.deps, patient: () => true }).wait(0);
+  const timings = { RESPONSE_TIMEOUT_MS: 300000 };
+
+  test("a reply that stays empty past the warm-up window is not called empty; the answer is read once it settles", async () => {
+    const h = createWatchHarness({ initial: { gen: false, reply: "" }, timings }).at(70000, { reply: "Answer" });
+    const res = await patient(h);
+    assert.deepEqual([res.kind, res.text], ["text", "Answer"]);
+    assert.ok(h.elapsed() >= 70000 + 15000, `took ${h.elapsed()} ms`);
+  });
+
+  test("a pause in the middle of a plain answer does not end it", async () => {
+    const h = createWatchHarness({ initial: { gen: false, reply: "Part one" }, timings }).at(8000, { reply: "Part one and two" });
+    const res = await patient(h);
+    assert.deepEqual([res.kind, res.text], ["text", "Part one and two"]);
+    assert.ok(h.elapsed() >= 8000 + 15000, `took ${h.elapsed()} ms`);
+  });
+
+  test("a complete command is read after a short quiet, not the full one", async () => {
+    const h = createWatchHarness({ initial: { gen: false, reply: CMD }, timings });
+    const res = await patient(h);
+    assert.equal(res.kind, "tool");
+    assert.ok(h.elapsed() >= 4000 && h.elapsed() < 15000, `took ${h.elapsed()} ms`);
+  });
+
+  test("an answer that never comes still ends by the response timeout", async () => {
+    const h = createWatchHarness({ initial: { gen: false, reply: "" }, timings: { RESPONSE_TIMEOUT_MS: 100000 } });
+    assert.equal((await patient(h)).kind, "timeout");
+  });
+});
+
 describe("ResponseWatcher: a page the adapter cannot read", () => {
   test("generating with no reply turn visible ends as 'unreadable' with layout diagnostics, not after minutes of silence", async () => {
     const h = createWatchHarness({ initial: { gen: true, reply: "", item: null, lastId: null, count: 0 } });

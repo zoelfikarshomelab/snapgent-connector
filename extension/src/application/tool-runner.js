@@ -19,6 +19,7 @@ import { LIST_SERVERS, isListCommands, renderCommandList, renderServerList } fro
 import { bareToolName } from "../domain/tools/names.js";
 import { DEFAULT_SERVER_ID } from "../domain/tools/default-server.js";
 import { callWithGuards } from "./call-guard.js";
+import { waitOut } from "./wait-loop.js";
 
 const DEFAULT_TIMEOUT_MS = 120000;
 // The size parameters a tool may advertise (read_files, run_command / run_project_script / run_tests, get_command_output).
@@ -36,9 +37,10 @@ export class ToolRunner {
    *           approvalMode?: () => string,
    *           workspaceRoot?: () => (string|null),   // the folder this chat works in, sent with every VS Code command
    *           timers?: import("./ports.js").Timers,
-   *           timeoutMs?: number }} deps
+   *           timeoutMs?: number,
+   *           now?: () => number }} deps
    */
-  constructor({ bridge, catalogue, session, visibility, sink, confirm = null, approvalMode = () => "manual", workspaceRoot = () => null, timers = globalThis, timeoutMs = DEFAULT_TIMEOUT_MS }) {
+  constructor({ bridge, catalogue, session, visibility, sink, confirm = null, approvalMode = () => "manual", workspaceRoot = () => null, timers = globalThis, timeoutMs = DEFAULT_TIMEOUT_MS, now = Date.now }) {
     this._bridge = bridge;
     this._catalogue = catalogue;
     this._session = session;
@@ -49,6 +51,7 @@ export class ToolRunner {
     this._workspaceRoot = workspaceRoot;
     this._timers = timers;
     this._timeoutMs = timeoutMs;
+    this._now = now;
   }
 
   /**
@@ -170,11 +173,20 @@ export class ToolRunner {
     } catch { /* ditto */ }
   }
 
+  /** wait_command is waited out here (see wait-loop.js): the model gets one answer when the command is over, not one per wait. */
+  _dispatch(name, args, target, jobKey) {
+    if (bareToolName(name) !== "wait_command") return this._callBridge(name, args, target, jobKey);
+    return waitOut(
+      (seconds) => this._callBridge(name, { ...args, wait_seconds: seconds }, target, jobKey),
+      { isStopped: () => this._session.isStopped(), now: this._now },
+    );
+  }
+
   async _execute(name, args, target, jobKey) {
     this._terminalBegin(jobKey, name, args, target);
     let result;
     try {
-      result = await this._callBridge(name, args, target, jobKey);
+      result = await this._dispatch(name, args, target, jobKey);
     } catch (error) {
       this._terminalEnd(jobKey, "failed");
       throw error;

@@ -100,11 +100,11 @@
   font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap;
   transition: background 0.14s ease;
 }
-#zs-play[hidden], #zs-discuss[hidden] { display: none; }
+#zs-play[hidden], #zs-discuss[hidden], #zs-patient[hidden] { display: none; }
 #zs-play:hover { background: #4ade80; }
 /* Discussion switch: dim while the agent is on, lit while it is off */
-#zs-discuss { opacity: 0.55; }
-#zs-discuss[data-on="1"] { opacity: 1; background: rgba(234, 179, 8, 0.28); }
+#zs-discuss, #zs-patient { opacity: 0.55; }
+#zs-discuss[data-on="1"], #zs-patient[data-on="1"] { opacity: 1; background: rgba(234, 179, 8, 0.28); }
 
 /* The dropdown pill (MCP target, Switch AI): one component, name at the left, arrow at the right edge. */
 .zs-pill {
@@ -869,14 +869,14 @@ html.zs-light .zs-file-active { background: rgba(234, 179, 8, 0.28); }
 html #zs-bar #zs-tools {
   order: 1; flex: none; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px;
 }
-#zs-term-btn, #zs-files-btn, #zs-skills-btn, #zs-mcp-btn, #zs-prefs-btn, #zs-info-btn, #zs-discuss {
+#zs-term-btn, #zs-files-btn, #zs-skills-btn, #zs-mcp-btn, #zs-prefs-btn, #zs-info-btn, #zs-discuss, #zs-patient {
   flex: none; position: relative; display: inline-flex; align-items: center; justify-content: center;
   width: 28px; height: 28px; box-sizing: border-box; padding: 0;
   border-radius: 9px; border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.07); color: #c7d2fe; cursor: pointer;
   transition: background 0.15s ease;
 }
-#zs-term-btn:hover, #zs-files-btn:hover, #zs-skills-btn:hover, #zs-mcp-btn:hover, #zs-prefs-btn:hover, #zs-info-btn:hover, #zs-discuss:hover { background: rgba(255, 255, 255, 0.13); }
+#zs-term-btn:hover, #zs-files-btn:hover, #zs-skills-btn:hover, #zs-mcp-btn:hover, #zs-prefs-btn:hover, #zs-info-btn:hover, #zs-discuss:hover, #zs-patient:hover { background: rgba(255, 255, 255, 0.13); }
 #zs-files-btn[hidden] { display: none; }
 #zs-term-badge, #zs-files-badge {
   position: absolute; top: -4px; right: -4px;

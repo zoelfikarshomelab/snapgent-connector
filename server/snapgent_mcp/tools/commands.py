@@ -182,7 +182,10 @@ def wait_command(ctx: Context, run_id: str, wait_seconds: Optional[int] = None, 
         if not run.running or time.monotonic() >= deadline:
             break
         run.wait(0.2)
-    return wait_report(run, run.take_new(run.output()), clamp_chars(max_output_chars))
+    final = run.output()  # one read for both: what arrived since the last look is shown live AND counted as seen, never only one of the two
+    if len(final) > seen:
+        _stream_new(ctx, final[seen:])
+    return wait_report(run, run.take_new(final), clamp_chars(max_output_chars))
 
 
 @tool("stop_command", "End a command that is running in the background (its run_id is in the note that said so), and what it started. "

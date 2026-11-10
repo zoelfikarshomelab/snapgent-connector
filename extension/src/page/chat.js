@@ -50,6 +50,7 @@ export function createChat({ document, provider, state, visibility, catalogue, d
     visibility: { isHidden: visibility.isHidden, parkHidden: visibility.parkHidden },
     isStopped: () => state.stop,
     sendToken: () => state.sendToken,
+    patient: () => state.patient,
     clock: { now: () => Date.now(), sleep },
     timings: provider.timings,
     knowsTool: (name) => catalogue.knows(name),

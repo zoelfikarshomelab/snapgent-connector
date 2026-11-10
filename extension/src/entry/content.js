@@ -9,6 +9,7 @@ import { createAccountScope } from "../page/account-scope.js";
 import { createAccountStorage } from "../page/account-storage.js";
 import { createAttachments } from "../page/attachments.js";
 import { createAgentMode } from "../page/agent-mode.js";
+import { createPatientMode } from "../page/patient-mode.js";
 import { createAtPopup } from "../page/at-popup.js";
 import { createAutoResume } from "../page/auto-resume.js";
 import { createBar } from "../page/bar.js";
@@ -80,6 +81,7 @@ let stop;
 let session;
 let attachments;
 let agentMode;
+let patientMode;
 let replay;
 ssh = createSsh({ document, send, settings, state, toast: (text) => bar.toast(text) });
 const calibration = createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast: (text) => bar.toast(text), previewStartMessage: () => session?.previewStartMessage?.(), previewReminderMessage: async () => { await tools.catalogue.ensure(); return tools.catalogue.active().length ? tools.reminderText() : null; } });
@@ -90,6 +92,7 @@ bar = createBar({
   onStop: () => stop.stopLoop(),
   onPlay: () => replay.play(),
   onAdopt: () => session.adopt(),
+  onTogglePatient: () => patientMode.toggle(),
   onToggleMode: () => { if (!agentMode.toggle()) bar.toast("Send a message first · this chat has no id yet"); },
 });
 
@@ -102,6 +105,7 @@ session = createSession({ state, provider, tools, chat, bar, reminder: loop.remi
 stop = createStop({ document, state, provider, bar, diag });
 agentMode = createAgentMode({ state, provider, storage, onStop: () => stop.stopLoop(), onChange: redraw, diag });
 replay = createReplay({ state, provider, executed, progress, loop, bar, diag });
+patientMode = createPatientMode({ state, provider, storage, onChange: redraw, diag });
 
 let userInput;
 attachments = createAttachments({ provider, state, tools, chat, bar, budget, parts, preferences, startTurn: (base) => userInput.startTurn(base), diag });

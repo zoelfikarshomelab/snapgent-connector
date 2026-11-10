@@ -8,6 +8,7 @@
 
 import { classifyReply, looksLikeCommand } from "../domain/agent/reply-classifier.js";
 import { hasOpenToolBlock } from "../domain/parser/index.js";
+import { patientGate } from "./patient-gate.js";
 import { WatchState } from "./watch-state.js";
 
 const NO_TURN_GRACE_MS = 30000;      // never finalize on a PREVIOUS turn's text for longer than this
@@ -35,7 +36,7 @@ export class ResponseWatcher {
    *   knowsTool: (name: string) => boolean,
    *   catalogueSize: () => number,
    *   describeLayout?: () => object,   // what the page looks like, logged when replies cannot be read
-   *   diag?: (event: string, data?: object) => void,
+   *   diag?: (event: string, data?: object) => void,   patient?: () => boolean,   // patient mode: see patient-gate.js
    *   phase?: (name: "waiting"|"writing"|"checking"|"reading") => void,   // what the watcher is doing now
    * }} deps
    */
@@ -87,7 +88,7 @@ export class ResponseWatcher {
       this._gateContextLimit(s) ||
       this._gateUnreadable(s, d) ||
       this._gateStreaming(s, d, gen) ||
-      this._gateNoTurnYet(s, d, gen, newReply, base) ||
+      this._gateNoTurnYet(s, d, gen, newReply, base) || patientGate(this._d.patient, s, d, (phase) => this._is(phase)) ||
       this._gateSettle(s) ||
       this._gateWarmup(s, d) ||
       this._gateReasoning(s, d) ||
@@ -108,7 +109,7 @@ export class ResponseWatcher {
     const hasText = !!((d.reply && d.reply.length) || (d.thinking && d.thinking.length));
     if (gen || (newReply && hasText)) { s.started = true; return pass; }
     if (!s.preStartSilent) s.preStartSilent = s.now();
-    if (s.now() - s.preStartSilent > PRE_START_SILENCE_MS) {
+    if (s.now() - s.preStartSilent > PRE_START_SILENCE_MS && !(this._d.patient && this._d.patient())) {
       this._diag("empty.why", { branch: "preStart", rep: (d.reply || "").length });
       return finish({ kind: "empty" });
     }
