@@ -54,6 +54,11 @@ export const FEEDBACK = {
     "\n\n(System note: the commands above were written in your own internal tool-call markup. They were run this time, but do not " +
     "use that markup or any internal tool of your own here. Call snapgent's general commands instead, as one plain-text JSON " +
     'object: {"command": "name", "params": { ...your parameters... }}.)',
+  // Appended to the result of a reply that held ONE command while more are allowed: the model drifts into one command per reply and
+  // the user had to remind it every time. `max` is the effective Commands per reply.
+  singleCommand: (max) =>
+    `\n\n(System note: your last reply held a single command. You may write up to ${max} commands in one reply; they run in order and are ` +
+    "answered in one message, so put commands that do not depend on each other in the same reply.)",
   // The editor has no folder open, so the server offers no commands. Said to the model instead of a list of no valid commands.
   workspaceClosed: (folder) =>
     `ERROR: no project folder is open in the user's editor right now, so no command can run${folder ? ` (this chat works in ${folder})` : ""}. ` +

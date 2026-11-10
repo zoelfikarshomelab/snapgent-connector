@@ -32,6 +32,12 @@ export class BatchRunner {
     return reserved;
   }
 
+  /** A reply with ONE command while more are allowed: tell the model so, so the user need not remind it. Nothing when the limit is not known. */
+  _batchHint(count) {
+    const max = this._budget.calls ? this._budget.calls() : 0;
+    return count === 1 && max > 1 ? FEEDBACK.singleCommand(max) : "";
+  }
+
   /**
    * Run every command of one reply in order and answer with ONE message. The message has a size limit: each command
    * gets an even share of what is left, and tools that can limit their own output read or keep only what fits. A
@@ -43,7 +49,8 @@ export class BatchRunner {
     const batch = calls.slice(0, maxCalls);
     const notRun = calls.slice(maxCalls).map((call) => ({ tool: call.tool, why: `at most ${maxCalls} commands per reply` }));
     const results = [];
-    const messageRoom = Math.max(MIN_CALL_CHARS, this._budget.limit() - this._reserved(batch));
+    const hint = this._batchHint(calls.length);
+    const messageRoom = Math.max(MIN_CALL_CHARS, this._budget.limit() - this._reserved(batch) - hint.length);
     // All the messages together may hold this much; the output of one command may run over from one message into the next.
     const room = this._d.parts ? messageRoom * MAX_RESULT_PARTS : messageRoom;
     const batchId = this._d.jobs ? await this._d.jobs.begin(item) : null;
@@ -96,6 +103,10 @@ export class BatchRunner {
     if (batch.some((call) => call.native)) {
       messages[messages.length - 1] += FEEDBACK.nativeFormat;
       this._diag("tools.nativeNote", { format: batch.find((call) => call.native).native });
+    }
+    if (hint) {
+      messages[messages.length - 1] += hint;
+      this._diag("tools.batchHint");
     }
     if (reminder.onResult({ isErr: failed, tool: last.tool, hasCatalogue: tools.hasCatalogue() })) {
       messages[messages.length - 1] += tools.reminderText();

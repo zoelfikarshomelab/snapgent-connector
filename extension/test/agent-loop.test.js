@@ -289,3 +289,33 @@ describe("AgentLoop: reminders", () => {
     assert.ok(h.state.submitted.every((s) => !s.text.includes("[REMINDER]")));
   });
 });
+
+describe("AgentLoop: the commands-per-reply hint", () => {
+  const withLimit = async (calls, responses) => {
+    const h = createLoopHarness({ responses });
+    await new AgentLoop({ ...h.deps, budget: calls === undefined ? undefined : { limit: () => 100000, calls: () => calls } }).run("base-0");
+    return h;
+  };
+  const twoCommands = { kind: "tool", item: { id: "turn" }, calls: [{ tool: "a" }, { tool: "b" }] };
+
+  test("a reply with one command is told how many it may write at once", async () => {
+    const h = await withLimit(5, [toolTurn("a"), textTurn]);
+    assert.ok(h.state.submitted[0].text.startsWith("» a\nok"));
+    assert.match(h.state.submitted[0].text, /up to 5 commands in one reply/);
+  });
+
+  test("it comes before the command reminder, which still ends the message", async () => {
+    const h = await withLimit(3, [toolTurn("a"), textTurn]);
+    const h2 = createLoopHarness({ responses: [toolTurn("a"), textTurn], reminderEvery: 1 });
+    await new AgentLoop({ ...h2.deps, budget: { limit: () => 100000, calls: () => 3 } }).run("base-0");
+    assert.match(h.state.submitted[0].text, /up to 3 commands/);
+    assert.match(h2.state.submitted[0].text, /up to 3 commands[\s\S]*\[REMINDER\]$/);
+  });
+
+  test("no hint when the reply already had several commands, when only one is allowed, or when the limit is not known", async () => {
+    for (const [calls, response] of [[5, twoCommands], [1, toolTurn("a")], [undefined, toolTurn("a")]]) {
+      const h = await withLimit(calls, [response, textTurn]);
+      assert.doesNotMatch(h.state.submitted[0].text, /in one reply/);
+    }
+  });
+});
