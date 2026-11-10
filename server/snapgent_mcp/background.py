@@ -34,6 +34,22 @@ def duration(seconds: float) -> str:
     return f"{secs} s"
 
 
+def append_log(path: Path, text: str) -> None:
+    """Add output to a log file. A log that cannot be written must not end the command."""
+    try:
+        with open(path, "a", encoding="utf-8", errors="replace") as handle:
+            handle.write(text)
+    except OSError:
+        pass
+
+
+def discard_log(path: Path) -> None:
+    try:
+        path.unlink()
+    except OSError:
+        pass
+
+
 def tail(text: str, limit: int) -> Tuple[str, int]:
     """The last `limit` characters of `text` (starting at a line when that costs little), and how many characters came before them."""
     if len(text) <= limit:
@@ -93,8 +109,11 @@ class BackgroundRun:
         stop_process(self.process)
 
     def write_log(self, text: str, append: bool = True) -> None:
+        if append:
+            append_log(self.log_path, text)
+            return
         try:
-            with open(self.log_path, "a" if append else "w", encoding="utf-8", errors="replace") as handle:
+            with open(self.log_path, "w", encoding="utf-8", errors="replace") as handle:
                 handle.write(text)
         except OSError:
             pass  # a log that cannot be written must not end the command
@@ -131,10 +150,15 @@ class BackgroundRuns:
             self._expire()
             return sum(1 for run in self._runs.values() if run.running) < self._max
 
-    def start(self, run_id: str, display: str, process: Any, started: float) -> BackgroundRun:
-        descriptor, name = tempfile.mkstemp(prefix=f"snapgent-{run_id}-", suffix=".log")  # a random name, readable by this user only
+    @staticmethod
+    def create_log(run_id: str) -> Path:
+        """An empty log file with a name nobody can guess, readable by this user only. Made when a command starts, so it can be followed from the first line."""
+        descriptor, name = tempfile.mkstemp(prefix=f"snapgent-{run_id}-", suffix=".log")
         os.close(descriptor)
-        run = BackgroundRun(run_id, display, process, started, Path(name), self._clock)
+        return Path(name)
+
+    def start(self, run_id: str, display: str, process: Any, started: float, log_path: Optional[Path] = None) -> BackgroundRun:
+        run = BackgroundRun(run_id, display, process, started, log_path or self.create_log(run_id), self._clock)
         with self._lock:
             self._runs[run_id] = run
         return run

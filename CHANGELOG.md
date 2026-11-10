@@ -13,6 +13,7 @@ All notable changes to snapgentV3 Free are documented here.
 - **Two checkboxes in Preferences choose what the start message carries**: *Send the project tree at the start* and *Send the project instruction files at the start*. Both are on by default, so nothing changes until one is switched off, and "Restore the defaults" ticks them again. With the tree off the start still checks that a folder is open (it reads only the top level) but sends no tree; with the instruction files off none is read.
 
 ### Fixed
+- **The log file of a long command stayed empty until the command ended.** The file in the temporary folder was only made when the command went on in the background (after 100 seconds) and the pipes were read line by line, so text without a newline (a progress bar, a prompt) was held back until the process ended. The log is now made when the command starts, every piece of output is written to it as it arrives, and pipes are read in pieces instead of lines. A command that ends inside the 100-second window removes its log. What the model is sent (the first 20 and last 50 lines) is unchanged.
 - **The tree in the start message ignored the folders left out of attachments.** Only the `@` list and the Files menu used that list, so a folder such as `.sqlx` that was added to it still filled the tree. The list is now sent with the tree request, and the server adds it to its own list of skipped folders.
 
 ### Added

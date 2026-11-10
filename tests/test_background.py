@@ -128,6 +128,37 @@ class HandoverTests(BackgroundCase):
             self.assertIn("get_command_output", str(caught.exception))
 
 
+class LogTests(BackgroundCase):
+    def test_the_log_is_written_while_the_command_is_still_inside_the_window_and_removed_when_it_ends_there(self):
+        created, seen = [], []
+        real = background.RUNS.create_log
+
+        def spy(run_id):
+            created.append(real(run_id))
+            return created[-1]
+
+        def on_chunk(stream, text):
+            seen.append(created[0].read_text(encoding="utf-8"))
+
+        with mock.patch.object(background.RUNS, "create_log", side_effect=spy):
+            process.run_process_streaming([sys.executable, "-u", "-c", "print('early')"], Path.cwd(), detach=True, on_chunk=on_chunk)
+        self.assertIn("early", seen[0])
+        self.assertFalse(created[0].exists(), "a command that ended inside the window leaves no log behind")
+
+    def test_text_without_a_newline_reaches_the_log_and_the_answer_while_the_command_runs(self):
+        source = "import sys, time\nsys.stdout.write('partial, no newline')\nsys.stdout.flush()\ntime.sleep(5)"
+        report, run = self.run_detached([sys.executable, "-u", "-c", source])
+        self.assertIsNotNone(run)
+        self.assertIn("partial, no newline", report)
+        self.assertIn("partial, no newline", run.log_path.read_text(encoding="utf-8"))
+
+    def test_what_is_printed_after_the_handover_is_written_to_the_log_as_it_comes(self):
+        _, run = self.run_detached(script(lines=30))
+        time.sleep(1.0)
+        self.assertTrue(run.running)
+        self.assertIn("line 5", run.log_path.read_text(encoding="utf-8"))
+
+
 class JobTests(BackgroundCase):
     def test_stop_still_ends_a_command_that_is_inside_the_window(self):
         with mock.patch.object(process, "FOREGROUND_SECONDS", 30):

@@ -1,5 +1,6 @@
 """Running child processes with bounded output and time."""
 
+import codecs
 import os
 import queue
 import subprocess
@@ -9,7 +10,7 @@ import time
 from pathlib import Path
 from typing import Callable, List, Optional, Tuple
 
-from .background import RUNS, BackgroundRun, handover_report
+from .background import RUNS, BackgroundRun, append_log, discard_log, handover_report
 from .jobs import CANCELLED_MESSAGE, current_job, stop_process
 from .limits import (BACKGROUND_MAX_SECONDS, COMMAND_OUTPUT_CHARS, COMMAND_TIMEOUT_SECONDS, FOREGROUND_SECONDS, MAX_OUTPUT_CHARS,
                      STREAM_MAX_CHARS, STREAM_MAX_CHUNKS)
@@ -26,6 +27,8 @@ POLL_SECONDS = 0.1
 # After the process is gone: how long to wait for a last line, and how many quiet rounds end the drain.
 DRAIN_SECONDS = 0.1
 DRAIN_QUIET_ROUNDS = 3
+# A pipe is read in pieces of at most this many bytes, so text without a newline (a progress bar, a prompt) is not held back until the command ends.
+READ_CHUNK_BYTES = 4096
 
 # on_chunk(stream, text): stream is "stdout" or "stderr". Must never raise into the runner (it is wrapped anyway).
 ChunkCallback = Callable[[str, str], None]
@@ -78,16 +81,22 @@ def child_environment() -> dict:
 
 
 def _drain_pipe(pipe, stream: str, events: "queue.Queue[_EVENT]", stop: threading.Event) -> None:
-    """Read one pipe to the end, forwarding every line. The reader never blocks the process exit."""
+    """Read one pipe to the end, forwarding whatever arrives as it arrives (not line by line). The reader never blocks the process exit."""
+    decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")  # a character can be split between two reads
     try:
-        for line in iter(pipe.readline, ""):
-            if line:
-                events.put((stream, line))
+        descriptor = pipe.fileno()
+        while True:
+            data = os.read(descriptor, READ_CHUNK_BYTES)
+            if not data:
+                break
+            text = decoder.decode(data)
+            if text:
+                events.put((stream, text))
             if stop.is_set():
                 break
-        remainder = pipe.read()
-        if remainder:
-            events.put((stream, remainder))
+        rest = decoder.decode(b"", final=True)
+        if rest:
+            events.put((stream, rest))
     except (OSError, ValueError):
         pass
     finally:
@@ -114,6 +123,7 @@ class _StreamState:
         # A command that goes on in the background has no final merged text: its output is the live one, as the log has it.
         self.keep_parts = True
         self.log: Optional[Callable[[str], None]] = None
+        self.log_path: Optional[Path] = None
 
     def keep(self, stream: str, text: str) -> None:
         if self.keep_parts:
@@ -188,13 +198,14 @@ def _flush(events: "queue.Queue[_EVENT]", state: _StreamState, on_chunk: Optiona
 
 def _hand_over(display: str, process, readers, events, stop, state: _StreamState, started: float) -> BackgroundRun:
     """The call has to answer but the command is not done: it goes on, and a thread of its own collects what it prints from here."""
-    run = RUNS.start(state.ensure_id(), display, process, started)
+    run = RUNS.start(state.ensure_id(), display, process, started, state.log_path)
     state.keep_parts = False  # no final merged text for a command that outlives its call
     state.out_parts.clear()
     state.err_parts.clear()
-    entry = CACHE.get(run.run_id)
-    run.write_log(str(entry["output"]) if entry else "", append=False)
-    state.log = run.write_log
+    if state.log_path is None:  # the log could not be made when the command started: begin it now, with what was printed so far
+        entry = CACHE.get(run.run_id)
+        run.write_log(str(entry["output"]) if entry else "", append=False)
+        state.log = run.write_log
     threading.Thread(target=_finish_in_background, args=(run, readers, events, stop, state), daemon=True, name=f"background-{run.run_id}").start()
     return run
 
@@ -254,6 +265,13 @@ def run_process_streaming(command: List[str], cwd: Path, timeout: int = COMMAND_
     )
     if job:
         job.attach(process)
+    if detach:
+        # The log exists from the first moment and every piece of output is written to it at once, so `tail -f` shows it while the command runs.
+        try:
+            state.log_path = RUNS.create_log(state.ensure_id())
+            state.log = lambda text, path=state.log_path: append_log(path, text)
+        except OSError:
+            state.log_path = None
     events: "queue.Queue[_EVENT]" = queue.Queue()
     stop = threading.Event()
     readers = [threading.Thread(target=_drain_pipe, args=(process.stdout, "stdout", events, stop), daemon=True),
@@ -312,6 +330,8 @@ def run_process_streaming(command: List[str], cwd: Path, timeout: int = COMMAND_
                     quiet = 0
                 else:
                     quiet += 1
+            if state.log_path is not None:
+                discard_log(state.log_path)  # it ended inside the window: nobody is told the log's name, so it is not left behind
     if handed_over:
         text = run.output()
         run.take_new(text)  # what the report shows counts as shown
