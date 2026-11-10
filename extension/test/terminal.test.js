@@ -125,4 +125,54 @@ describe("the terminal panel store", () => {
     const page = setup();
     assert.ok(page.$(".zs-t-grip"), "the bottom-left grip is drawn");
   });
+
+  describe("moving and resizing", () => {
+    function placed() {
+      const page = setup();
+      const { window } = page;
+      Object.defineProperty(window.document.documentElement, "clientWidth", { value: 1000, configurable: true });
+      Object.defineProperty(window.document.documentElement, "clientHeight", { value: 800, configurable: true });
+      const panel = page.$("#zs-term");
+      panel.getBoundingClientRect = () => ({ left: 100, right: 500, top: 10, width: 400, height: 300 });
+      Object.defineProperty(panel, "offsetWidth", { value: 400, configurable: true });
+      Object.defineProperty(panel, "offsetHeight", { value: 300, configurable: true });
+      const fire = (el, type, x, y) => el.dispatchEvent(Object.assign(new window.Event(type, { bubbles: true }), { clientX: x, clientY: y }));
+      return { panel, handle: page.$(".zs-t-drag"), grip: page.$(".zs-t-grip"), fire };
+    }
+
+    test("the panel has a move handle like the Files window", () => {
+      const page = setup();
+      assert.ok(page.$(".zs-t-drag"), "the move handle is drawn");
+    });
+
+    test("dragging the handle moves the panel and keeps it inside the window", () => {
+      const { panel, handle, fire } = placed();
+      fire(handle, "pointerdown", 200, 200);
+      fire(handle, "pointermove", 250, 260);
+      assert.equal(panel.style.left, "150px");
+      assert.equal(panel.style.top, "70px");
+      assert.equal(panel.style.right, "auto");
+      assert.equal(panel.style.bottom, "auto");
+      fire(handle, "pointermove", 5000, 5000);
+      assert.equal(panel.style.left, "600px", "stops at the right edge of the page");
+      assert.equal(panel.style.top, "500px", "stops at the bottom of the page");
+      fire(handle, "pointerup", 5000, 5000);
+      fire(handle, "pointermove", 0, 0);
+      assert.equal(panel.style.left, "600px", "nothing changes after the drag ended");
+    });
+
+    test("resizing after a move keeps the top and right edges where they are", () => {
+      const { panel, grip, fire } = placed();
+      fire(grip, "pointerdown", 100, 310);
+      fire(grip, "pointermove", 50, 360);
+      assert.equal(panel.style.width, "450px");
+      assert.equal(panel.style.height, "350px");
+      assert.equal(panel.style.right, "500px");
+      assert.equal(panel.style.left, "auto");
+      assert.equal(panel.style.top, "10px");
+      fire(grip, "pointermove", -5000, 9000);
+      assert.equal(panel.style.width, "500px", "the left edge stops at the page's left");
+      assert.equal(panel.style.height, "790px", "the bottom stops at the page's bottom");
+    });
+  });
 });

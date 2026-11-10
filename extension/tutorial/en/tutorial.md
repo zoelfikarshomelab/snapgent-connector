@@ -92,9 +92,7 @@ Folders left out of attachments: this part relates to File/Folder; if a folder/f
 
 Project instruction files: this part is the reference md file, usually used as rules in a project so the AI can obey those rules. It works by injecting the md file at the start when a chat session begins.
 
-Move to the top right corner, moves the popup menu position to the top right corner.
-
-Hide the bar, hides the popup (also possible from the lightning icon)
+The lightning icon shows or hides the bar, and dragging it moves the bar anywhere on the screen (the position is remembered).
 
 @gambar(1794051319093.png, width=50)
 

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Seats the control bar once per animation frame in a corner of the window, next to its show/hide button. The corner and
-// whether the bar is shown are the user's choice (bar-prefs); the geometry is pure (bar-placement.js).
+// Seats the control bar once per animation frame next to its show/hide button, which the user drags where they like. The position
+// and whether the bar is shown are the user's choice (bar-prefs); the geometry is pure (bar-placement.js).
 
-import { barGeometry, cornerOf, floatingStopGeometry, toggleGeometry } from "./bar-placement.js";
+import { barGeometry, floatingStopGeometry, positionOf, toggleGeometry } from "./bar-placement.js";
 
 /**
- * @param {{ document: Document, provider: object, prefs: () => { corner: string, hidden: boolean },
+ * @param {{ document: Document, provider: object, prefs: () => { left?: number|null, top?: number|null, hidden: boolean },
  *           parts: () => { bar: HTMLElement|null, root: HTMLElement|null, menuEl: HTMLElement|null, toggleEl: HTMLElement|null,
  *                      stopEl?: HTMLElement|null, stopFloatEl?: HTMLElement|null },
  *           positionMenu: (anchorRect: object) => void }} deps
@@ -20,8 +20,9 @@ export function createBarPlacer({ document, provider, prefs, parts, positionMenu
 
     const win = document.defaultView;
     const viewport = { width: win.innerWidth, height: win.innerHeight };
-    const { corner, hidden } = prefs();
-    const where = cornerOf(corner);
+    const saved = prefs();
+    const hidden = saved.hidden;
+    const where = positionOf(saved);
     // A bot check or a login/consent modal is up: stay out of its way entirely until it clears.
     const obstructed = !!((provider.captchaPresent && provider.captchaPresent()) || (provider.overlayBlocking && provider.overlayBlocking()));
 
@@ -31,7 +32,7 @@ export function createBarPlacer({ document, provider, prefs, parts, positionMenu
       ui.toggleEl.style.left = `${t.left}px`;
       ui.toggleEl.style.top = `${t.top}px`;
       ui.toggleEl.setAttribute("aria-pressed", hidden ? "false" : "true");
-      ui.toggleEl.title = hidden ? "Show snapgent" : "Hide snapgent";
+      ui.toggleEl.title = `${hidden ? "Show snapgent" : "Hide snapgent"} (drag to move)`;
     }
     // While the bar is hidden its own Stop button is hidden with it: a copy of it sits on the show/hide button instead.
     if (ui.stopFloatEl && ui.stopEl) {

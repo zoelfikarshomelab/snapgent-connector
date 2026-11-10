@@ -13,16 +13,14 @@ const TUTORIAL_SIZE_KEY = "zsTutorialSize";
 
 /**
  * @param {{ document: Document, root: HTMLElement, settings: object, serverDirectory: object, tools: object, preferences: object,
- *           calibration: object, barPrefs: { get: () => object, set: (change: object) => void }, isWorkspaceTarget: () => boolean,
+ *           calibration: object, isWorkspaceTarget: () => boolean,
  *           syncMenus: () => void }} deps
  * @returns {{ openPreferences: () => Promise<void> }} the Preferences dialog, usable from other parts of the bar
  */
-export function createBarSettings({ document, root, settings, serverDirectory, tools, preferences, calibration, barPrefs, isWorkspaceTarget, syncMenus, storage }) {
+export function createBarSettings({ document, root, settings, serverDirectory, tools, preferences, calibration, isWorkspaceTarget, syncMenus, storage }) {
   const $ = (selector) => root.querySelector(selector);
 
   const actions = () => ({
-    onToggleCorner: () => barPrefs.set({ corner: barPrefs.get().corner === "top" ? "bottom" : "top" }),
-    onHideBar: () => barPrefs.set({ hidden: true }),
     onCalibrate: () => calibration.open(null),
     onExportCal: calibration.exportProfile,
     onImportCal: calibration.importProfile,
@@ -41,7 +39,7 @@ export function createBarSettings({ document, root, settings, serverDirectory, t
     openPreferences({
       document, values: { ...(await preferences.read()), site: calibration.limits() }, defaults: { folders: preferences.defaultFolders(), contextFiles: preferences.defaultContextFiles() },
       save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders, contextFiles: preferences.setContextFiles, asFile: preferences.setAsFile, startContext: preferences.setStartContext, startTree: preferences.setStartTree, site: calibration.setLimits },
-      corner: barPrefs.get().corner, actions: actions(),
+      actions: actions(),
     });
   }
 

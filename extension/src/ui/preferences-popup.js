@@ -26,14 +26,13 @@ const slider = (id, label, min, max, step, note) =>
  *           defaults: { folders: string[], contextFiles?: string[] },
  *           save: { chars: (value: number) => void, calls: (value: number) => void, folders: (list: string[]) => void, contextFiles?: (list: string[]) => void } }} deps
  */
-export function openPreferences({ document, values, defaults, save, corner = "bottom", actions = {} }) {
+export function openPreferences({ document, values, defaults, save, actions = {} }) {
   const contextFiles = values.contextFiles || [];
   const defaultContextFiles = defaults.contextFiles || DEFAULT_CONTEXT_FILES;
   const { pop, close } = mountPopup(document);
   const row = (id, title, note = "") =>
     `<button class="zs-site-opt" id="${id}" type="button"><span class="zs-site-name"><span>${title}</span>` +
     (note ? `<span class="zs-site-host">${note}</span>` : "") + `</span></button>`;
-  const otherCorner = corner === "top" ? "bottom right" : "top right";
   // Only offered on a calibrated site (`values.site` is undefined otherwise); null means it has no values of its own yet.
   const siteBox = values.site !== undefined && save.site
     ? `<label class="zs-pref" style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" id="zs-pref-site" style="margin-top:3px"><span><b>Only for this site</b>` +
@@ -47,11 +46,6 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
     "The list of the project's files and folders goes in the first message, within a share of the message size. The folders left out of attachments (below) are left out of it too. Turn it off to save tokens: the AI can still run the tree command.") +
     tick("zs-pref-start-context", "Send the project instruction files at the start",
       "The first file found in the list below (usually AGENTS.md) goes in the first message. Turn it off and the AI will not see these instructions unless you point it to the file.");
-  const barSection = actions.onToggleCorner
-    ? `<section class="zs-menu-sec"><div class="zs-sec-label"><span>This bar</span></div>` +
-      row("zs-bar-corner", `Move to the ${otherCorner} corner`) +
-      row("zs-bar-hide", "Hide the bar", "the small button in the corner shows it again") + `</section>`
-    : "";
   const siteSection = actions.onCalibrate
     ? `<section class="zs-menu-sec"><div class="zs-sec-label"><span>This site</span></div>` +
       row("zs-cal-start", "Calibrate this site", "teach it where the text box, send button and replies are") +
@@ -95,7 +89,7 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
     `<textarea id="zs-pref-context" rows="4" spellcheck="false" style="width:100%;box-sizing:border-box;margin-top:8px;${MONO};background:transparent;color:inherit;${BOX};padding:6px" ` +
     `aria-label="Project instruction files">${esc(contextFiles.join("\n"))}</textarea>` +
     `<div class="zs-mcp-pop-note">One file name per line. The first one found in the workspace is sent to the AI as project instructions when a session starts (usually <code>AGENTS.md</code>).</div></div>` +
-    barSection + siteSection +
+    siteSection +
     `</div>` +
     `<div class="zs-mcp-pop-foot"><button id="zs-pref-reset" class="zs-mcp-pop-btn zs-mcp-pop-btn-block">Restore the defaults</button></div></div>`);
   pop.querySelector(".zs-mcp-pop-close").addEventListener("click", close);
@@ -167,8 +161,6 @@ export function openPreferences({ document, values, defaults, save, corner = "bo
   for (const type of ["keydown", "keyup", "keypress"]) contextBox.addEventListener(type, (event) => event.stopPropagation());
   contextBox.addEventListener("change", () => { if (save.contextFiles) save.contextFiles(contextBox.value.split("\n").map((s) => s.trim()).filter(Boolean)); });
   const action = (id, fn) => { const el = pop.querySelector(`#${id}`); if (el && fn) el.addEventListener("click", () => { close(); fn(); }); };
-  action("zs-bar-corner", actions.onToggleCorner);
-  action("zs-bar-hide", actions.onHideBar);
   action("zs-cal-start", actions.onCalibrate);
   action("zs-cal-export", actions.onExportCal);
   action("zs-cal-import", actions.onImportCal);

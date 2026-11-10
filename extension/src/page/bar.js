@@ -65,19 +65,47 @@ export function createBar({ document, window, provider, state, settings, serverD
   const $ = (selector) => root.querySelector(selector);
   const el = { bar: $("#zs-bar"), state: $("#zs-state"), action: $("#zs-action"), stop: $("#zs-stop"), play: $("#zs-play"), discuss: $("#zs-discuss"), patient: $("#zs-patient"), stopFloat: $("#zs-stop-float"), toggle: $("#zs-toggle"), menu: $("#zs-menu") };
 
-  // Where the bar sits and whether it is shown: the user's choice, the same on every site.
-  let prefs = { corner: "bottom", hidden: false };
+  // Where the bar sits (the show/hide button's left/top, null until it is dragged) and whether it is shown: the user's choice, the same on every site.
+  let prefs = { left: null, top: null, hidden: false };
   storage.get("zsBarPrefs").then((saved) => { if (saved) prefs = { ...prefs, ...saved }; });
   storage.watch("zsBarPrefs", (saved) => { prefs = { ...prefs, ...saved }; });
   const barPrefs = { get: () => prefs, set(change) { prefs = { ...prefs, ...change }; storage.set("zsBarPrefs", prefs); } };
-  el.toggle.addEventListener("click", (event) => { event.stopPropagation(); barPrefs.set({ hidden: !prefs.hidden }); });
+  // The show/hide button is also the handle: a click shows or hides the bar, a drag moves it (the bar follows the button).
+  let drag = null;
+  let suppressClick = false;
+  el.toggle.addEventListener("pointerdown", (event) => {
+    if (event.button) return;
+    const rect = el.toggle.getBoundingClientRect();
+    drag = { x: event.clientX, y: event.clientY, left: rect.left, top: rect.top, moved: false };
+    if (el.toggle.setPointerCapture) el.toggle.setPointerCapture(event.pointerId);
+  });
+  el.toggle.addEventListener("pointermove", (event) => {
+    if (!drag) return;
+    const dx = event.clientX - drag.x;
+    const dy = event.clientY - drag.y;
+    if (!drag.moved && Math.hypot(dx, dy) < 4) return; // a click that wobbles is still a click
+    drag.moved = true;
+    prefs = { ...prefs, left: Math.round(drag.left + dx), top: Math.round(drag.top + dy) };
+  });
+  const endDrag = () => {
+    if (!drag) return;
+    if (drag.moved) {
+      suppressClick = true; // the click that ends a drag must not also hide the bar
+      setTimeout(() => { suppressClick = false; }, 0);
+      barPrefs.set({}); // keeps the place the button was dropped
+    }
+    drag = null;
+  };
+  el.toggle.addEventListener("pointerup", endDrag);
+  el.toggle.addEventListener("pointercancel", endDrag);
+  el.toggle.addEventListener("click", (event) => { event.stopPropagation(); if (suppressClick) return; barPrefs.set({ hidden: !prefs.hidden }); });
 
   const group = createMenuGroup();
   const menus = createBarMenus({ document, root, group, settings, serverDirectory, send, confirm: tools.confirm, catalogue: tools.catalogue, workspace: tools.workspace, monitor, toast: notifications.toast, ssh });
   // Skills, MCP servers and Preferences live in their own buttons; the Files window opens the same Preferences dialog.
   const isWorkspaceTarget = () => isWorkspaceServer(settings.target(), tools.catalogue ? tools.catalogue.active().map((t) => t.name) : []);
   const barSettings = createBarSettings({
-    document, root, settings, serverDirectory, tools, preferences, calibration, barPrefs, isWorkspaceTarget, storage,
+    document, root, settings, serverDirectory, tools, preferences, calibration, isWorkspaceTarget, storage,
     syncMenus: () => menus.sync(),
   });
   const filesMenu = createFilesMenu({

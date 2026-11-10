@@ -217,23 +217,22 @@ describe("preferences panel", () => {
     assert.deepEqual(called, ["reminder"]);
   });
 
-  test("bar and calibration actions are offered and wired", () => {
+  test("calibration actions are offered and wired, and there is no section for the bar", () => {
     const w = new JSDOM("<!doctype html><body></body>").window;
     const called = [];
     openPreferences({
       document: w.document, values: { chars: 100000, calls: 8, folders: [] }, defaults: { folders: [] },
-      save: { chars() {}, calls() {}, folders() {} }, corner: "bottom",
-      actions: { onToggleCorner: () => called.push("corner"), onCalibrate: () => called.push("cal"), onExportAll: () => called.push("all") },
+      save: { chars() {}, calls() {}, folders() {} },
+      actions: { onCalibrate: () => called.push("cal"), onExportAll: () => called.push("all") },
     });
-    const corner = w.document.querySelector("#zs-bar-corner");
+    assert.equal(w.document.querySelector("#zs-bar-corner"), null);
+    assert.equal(w.document.querySelector("#zs-bar-hide"), null);
     const start = w.document.querySelector("#zs-cal-start");
     const all = w.document.querySelector("#zs-cal-export-all");
-    assert.match(corner.textContent, /top right corner/);
     // Clicking a row closes the popup, so the references are taken before the first click.
-    corner.click();
     start.click();
     all.click();
-    assert.deepEqual(called, ["corner", "cal", "all"]);
+    assert.deepEqual(called, ["cal", "all"]);
   });
 });
 

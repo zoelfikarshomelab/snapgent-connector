@@ -92,9 +92,7 @@ Folders left out of attachments, bagian ini terkait ke File/Folder, jika folder/
 
 Project instruction files, bagian ini adalah file md acuan, biasanya digunakan sebagai rules dalam suatu project agar AI bisa mematuhi aturan tersebut. cara kerjanya file md akan diinjeksi di awal ketika sesi chat dimulai.
 
-Move to the top right corner, memindahkan posisi popup menu jadi di pojok kanan atas.
-
-Hide the bar, menyembunyikan popup (bisa juga dari ikon listrik)
+Ikon listrik menampilkan atau menyembunyikan bar, dan kalau di-drag bar bisa dipindah ke mana saja di layar (posisinya diingat).
 
 @gambar(1794051319093.png, width=50)
 
