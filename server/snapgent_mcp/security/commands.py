@@ -1,5 +1,6 @@
 """Classifying `run_command` requests. Everything not clearly harmless needs the user's approval."""
 
+import re
 from typing import List, Sequence
 
 # Read-only git subcommands that need no approval.
@@ -12,6 +13,15 @@ VERSION_PROBES = frozenset({
     "go", "dotnet", "java", "javac", "mvn", "gradle", "tsc", "php", "ruby", "make",
 })
 VERSION_FLAGS = (["--version"], ["-v"], ["-V"], ["version"])
+# Programs that raise the privileges of whatever follows. They need approval in every mode that can run processes, even in Auto.
+PRIVILEGE_COMMANDS = frozenset({"sudo", "sudoedit", "su", "doas", "pkexec", "runuser", "runas"})
+# Programs that start another program or a script from their arguments, so a privilege command can hide inside them.
+WRAPPER_COMMANDS = frozenset({
+    "bash", "sh", "zsh", "dash", "ksh", "fish", "env", "xargs", "nohup", "time", "timeout", "nice", "ionice", "setsid",
+    "stdbuf", "watch", "exec", "command", "busybox", "script", "cmd", "powershell", "pwsh",
+})
+# A privilege command as a whole word; `pseudo` or `--sudo-x` are not it, but `/usr/bin/sudo` and `;sudo` are.
+_PRIVILEGE_WORD = re.compile(r"(?<![\w.\-])(?:" + "|".join(sorted(PRIVILEGE_COMMANDS)) + r")(?![\w.])")
 # Characters cmd.exe treats specially: with a .cmd/.bat shim in the way they would inject a second command.
 CMD_METACHARACTERS = frozenset('&|<>^%!"\r\n')
 
@@ -26,6 +36,20 @@ def is_bare_name(command: str) -> bool:
     """A name looked up on PATH, not a path into the workspace (which could be a planted program)."""
     stripped = command.strip()
     return bool(stripped) and "/" not in stripped and "\\" not in stripped and not stripped.startswith(".")
+
+
+def escalates_privileges(command: str, args: Sequence[str]) -> bool:
+    """True when this runs something as another user (sudo and friends), directly or inside a shell or wrapper program.
+
+    Deliberately blunt: a false alarm costs one approval click, a miss hands the model root. It cannot see through
+    interpreters (`python -c "os.system('sudo ...')"`), which is why those are not harmless either.
+    """
+    name = executable_name(command)
+    if name in PRIVILEGE_COMMANDS:
+        return True
+    if name in WRAPPER_COMMANDS:
+        return any(_PRIVILEGE_WORD.search(str(arg).lower()) for arg in args)
+    return False
 
 
 def is_harmless(command: str, args: Sequence[str], extra_allowed: frozenset = frozenset()) -> bool:

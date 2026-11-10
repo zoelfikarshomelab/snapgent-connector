@@ -5,7 +5,7 @@ from typing import FrozenSet, Mapping
 
 READONLY = "readonly"   # observe only: no writes, no processes, no git changes
 STANDARD = "standard"   # default: edits are free; risky actions ask the user first
-TRUSTED = "trusted"     # no confirmations (hard rules still apply)
+TRUSTED = "trusted"     # no confirmations, except for elevated privileges such as sudo (hard rules still apply)
 MODES = (READONLY, STANDARD, TRUSTED)
 
 # What the extension's bar offers, and the mode each choice means. The extension sends its choice with every call in a reserved

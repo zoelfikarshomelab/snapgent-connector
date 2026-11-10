@@ -106,6 +106,11 @@ def decide(policy: Policy, name: str, tool_risk: str, arguments: Dict[str, Any],
         return _deny(f"Plan mode: the user allows reading only, so '{name}' was not run. Keep to reading the workspace, then describe the plan "
                      "(what you would change and why); you may save it as a Markdown file of any name under .snapgent/plans/ (for example "
                      ".snapgent/plans/add-login.md), nothing else. Then wait for the user to switch the bar to Manual or Auto.")
+    if name == "run_command" and tool_risk == risk.EXECUTE:
+        # Before the TRUSTED shortcut and before the user's allowlist: elevated privileges are never approved in advance.
+        command, args = str(arguments.get("command", "")), [str(a) for a in arguments.get("args") or []]
+        if commands.escalates_privileges(command, args):
+            return _ask(f"Run with elevated privileges (sudo or similar): {commands.describe(command, args)}")
     if policy.mode == TRUSTED:
         return _ALLOW
     return _standard(name, tool_risk, arguments, paths, policy, session)

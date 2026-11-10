@@ -93,6 +93,18 @@ class CommandTests(unittest.TestCase):
         self.assertEqual(len(cmd.describe("x", ["a" * 1000])), 300)
 
 
+    def test_privilege_escalation_is_detected_directly_and_inside_wrappers(self):
+        for command, args in (("sudo", ["ls"]), ("/usr/bin/sudo", []), ("doas", ["id"]), ("pkexec", ["x"]), ("su", ["-"]),
+                              ("bash", ["-lc", "sudo awk '/x/,/^}/' /boot/grub/grub.cfg | head -4"]), ("sh", ["-c", "ls && sudo rm x"]),
+                              ("bash", ["-c", "echo hi;sudo id"]), ("env", ["sudo", "id"]), ("timeout", ["5", "/usr/bin/sudo", "id"])):
+            self.assertTrue(cmd.escalates_privileges(command, args), (command, args))
+
+    def test_ordinary_commands_are_not_mistaken_for_escalation(self):
+        for command, args in (("git", ["status"]), ("grep", ["sudo", "notes.txt"]), ("bash", ["-c", "echo pseudo issue"]),
+                              ("bash", ["-c", "ls --sudo-x"]), ("cat", ["sudoers.md"]), ("bash", ["-lc", "ls -la"])):
+            self.assertFalse(cmd.escalates_privileges(command, args), (command, args))
+
+
 class ClockStub:
     def __init__(self):
         self.now = 1000.0
@@ -202,6 +214,15 @@ class DecisionMatrixTests(unittest.TestCase):
         self.assertEqual(self.verdict("delete_file", risk.DESTRUCTIVE, {"path": ".snapgent/plans/x.md"}, p), DENY)
         self.assertEqual(self.verdict("copy_file", risk.WRITE, {"source": "a.md", "destination": ".snapgent/plans/x.md"}, p), DENY)
         self.assertEqual(self.verdict("run_command", risk.EXECUTE, {"command": "ls"}, p), DENY)
+
+    def test_elevated_privileges_ask_in_manual_and_auto_and_cannot_be_allowlisted(self):
+        wrapped = {"command": "bash", "args": ["-lc", "sudo awk '/x/' /boot/grub/grub.cfg"]}
+        for policy in (Policy(STANDARD), Policy(TRUSTED), Policy(STANDARD, frozenset({"sudo", "bash"})), Policy(TRUSTED, frozenset({"sudo"}))):
+            self.assertEqual(self.verdict("run_command", risk.EXECUTE, {"command": "sudo", "args": ["ls"]}, policy), CONFIRM, policy)
+            self.assertEqual(self.verdict("run_command", risk.EXECUTE, wrapped, policy), CONFIRM, policy)
+        self.assertEqual(self.verdict("run_command", risk.EXECUTE, wrapped, Policy(READONLY)), DENY)
+        reason = decide(Policy(TRUSTED), "run_command", risk.EXECUTE, {"command": "sudo", "args": ["ls"]}, SessionState()).reason
+        self.assertEqual(reason, "Run with elevated privileges (sudo or similar): sudo ls")
 
     def test_trusted_mode_never_asks(self):
         p = Policy(TRUSTED)
