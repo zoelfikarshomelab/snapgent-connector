@@ -12,6 +12,7 @@ import { exampleCall } from "../domain/tools/example-call.js";
 import { feed, state as freshState } from "../ui/ansi.js";
 import { parseToolCalls } from "../domain/parser/index.js";
 import { jobKey } from "../domain/tools/job-key.js";
+import { formatClock, formatDuration } from "../domain/tools/run-times.js";
 import { feedbackIsError, runningDetail } from "../domain/tools/result-summary.js";
 
 const MAX_TABS = 20; // finished commands remembered before the oldest is dropped
@@ -38,15 +39,15 @@ async function copyToClipboard(document, text) {
 
 /**
  * @param {{ document: Document, diag: (event: string, data?: object) => void,
- *           onChange?: () => void, copy?: (text: string) => Promise<boolean> }} deps  `onChange` is a tab being
- *   opened or settled (the bar's badge reads the state); `copy` puts text on the clipboard.
+ *           onChange?: () => void, copy?: (text: string) => Promise<boolean>, now?: () => number }} deps  `onChange` is a tab being
+ *   opened or settled (the bar's badge reads the state); `copy` puts text on the clipboard; `now` is the clock (milliseconds).
  * @returns {{ toggle: () => void, begin: (job: { key: string, name: string, label: string }) => void,
  *             ingest: (message: object) => void, finish: (key: string, status: string, result?: string) => void,
  *             setCancel: (cancel: (key: string, name: string) => void) => void,
  *             setRunner: (run: (call: object, options: { jobKey: string }) => Promise<string>) => void,
  *             runningCount: () => number, start: () => void }}
  */
-export function createTerminal({ document, diag, onChange = () => {}, copy = (text) => copyToClipboard(document, text) }) {
+export function createTerminal({ document, diag, onChange = () => {}, copy = (text) => copyToClipboard(document, text), now = () => Date.now() }) {
   const panel = createTerminalPanel({ document, onStop: (key) => stop(key), onCopy: (key) => copyTab(key), onRun: (text) => submit(text), onExamples: () => showExamples() });
   const tabs = new Map(); // key -> { key, name, label, status, state, lines, streamed, result }
   let cancel = null;
@@ -60,7 +61,12 @@ export function createTerminal({ document, diag, onChange = () => {}, copy = (te
   function draw() {
     // Running first (there is at most one per chat), then the finished ones, newest first.
     const ordered = [...running(), ...[...tabs.values()].filter((tab) => tab.status !== "running").reverse()];
-    panel.setTabs(ordered.map((tab) => ({ key: tab.key, name: labelOf(tab), status: tab.status })));
+    // The tab's name is shortened to fit; the full command and the times go with it for the info strip and the tooltip.
+    panel.setTabs(ordered.map((tab) => ({
+      key: tab.key, name: labelOf(tab), status: tab.status, command: tab.label || tab.name,
+      started: formatClock(tab.startedAt), ended: tab.endedAt === null ? "" : formatClock(tab.endedAt),
+      took: tab.endedAt === null ? "" : formatDuration(tab.endedAt - tab.startedAt),
+    })));
     return ordered;
   }
 
@@ -76,7 +82,7 @@ export function createTerminal({ document, diag, onChange = () => {}, copy = (te
   /** A command left the model's reply (or the input) under a job key: it gets a tab, and streams may now arrive for it. */
   function begin({ key, name, label }) {
     if (!key || tabs.has(key)) return;
-    tabs.set(key, { key, name, label, status: "running", state: freshState(), lines: [], streamed: false, result: "" });
+    tabs.set(key, { key, name, label, status: "running", state: freshState(), lines: [], streamed: false, result: "", startedAt: now(), endedAt: null });
     // Only the newest finished tabs are kept; the running one is never dropped.
     const finished = [...tabs.values()].filter((tab) => tab.status !== "running");
     while (tabs.size > MAX_TABS && finished.length) {
@@ -112,7 +118,7 @@ export function createTerminal({ document, diag, onChange = () => {}, copy = (te
   function finish(key, status, result = "") {
     const tab = tabs.get(key);
     if (!tab) return;
-    if (tab.status === "running") tab.status = status;
+    if (tab.status === "running") { tab.status = status; tab.endedAt = now(); }
     if (typeof result === "string" && result && !tab.result) {
       tab.result = result;
       if (!tab.streamed) for (const segments of feed(freshState(), `${result}\n`).lines) panel.appendLine(key, segments);

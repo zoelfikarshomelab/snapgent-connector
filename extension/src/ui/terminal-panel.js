@@ -20,6 +20,7 @@ const TEMPLATE = `
       <button type="button" class="zs-t-close" aria-label="Close the terminal">&#10005;</button>
     </div>
     <div class="zs-t-tabs" role="tablist"></div>
+    <div class="zs-t-meta" hidden><div class="zs-t-cmd"></div><div class="zs-t-times"></div></div>
     <div class="zs-t-body"></div>
     <div class="zs-t-entry">
       <textarea class="zs-t-input" rows="2" spellcheck="false" aria-label="Command to run" placeholder='{"command":"git_status","params":{}}'></textarea>
@@ -53,6 +54,24 @@ export function createTerminalPanel({ document, onStop = () => {}, onCopy = () =
   const runEl = panel.querySelector(".zs-t-run");
   const hintEl = panel.querySelector(".zs-t-hint");
   const bodies = new Map(); // tab key -> { el, count }
+  const metaEl = panel.querySelector(".zs-t-meta");
+  const cmdEl = panel.querySelector(".zs-t-cmd");
+  const timesEl = panel.querySelector(".zs-t-times");
+  let infos = new Map(); // tab key -> the tab as page/terminal.js described it
+
+  /** The selected command in full, with when it started and ended: the tab itself is too narrow for either. */
+  function timesText(tab) {
+    if (!tab.started) return "";
+    return tab.status === "running" ? `Started ${tab.started} · running` : `Started ${tab.started} · ended ${tab.ended} · took ${tab.took}`;
+  }
+
+  function showMeta(key) {
+    const tab = infos.get(key);
+    metaEl.hidden = !tab;
+    if (!tab) return;
+    cmdEl.textContent = `$ ${tab.command || tab.name}`;
+    timesEl.textContent = timesText(tab);
+  }
 
   // The panel is anchored at the top-right, so its bottom-left grip is the only corner that can grow
   // in both directions: left widens it, down makes it taller. Never larger than the window.
@@ -129,9 +148,11 @@ export function createTerminalPanel({ document, onStop = () => {}, onCopy = () =
 
   /** One pill in the tab row. */
   function setTabs(tabs) {
+    infos = new Map(tabs.map((tab) => [tab.key, tab]));
     setHtml(tabsEl, tabs.map((tab) => {
       const marker = tab.status === "running" ? "●" : tab.status === "success" ? "✓" : tab.status === "stopped" ? "⏹" : "✕";
-      return `<button type="button" class="zs-t-tab zs-t-${tab.status}${tab.key === selected ? " zs-t-sel" : ""}" data-key="${escapeHtml(tab.key)}" role="tab">` +
+      const tip = [tab.command || tab.name, timesText(tab)].filter(Boolean).join("\n");
+      return `<button type="button" class="zs-t-tab zs-t-${tab.status}${tab.key === selected ? " zs-t-sel" : ""}" data-key="${escapeHtml(tab.key)}" title="${escapeHtml(tip)}" role="tab">` +
         `<span class="zs-t-dot">${marker}</span><span class="zs-t-name">${escapeHtml(tab.name)}</span></button>`;
     }).join("") || '<span class="zs-t-empty">No command has run yet.</span>');
     for (const el of tabsEl.querySelectorAll(".zs-t-tab")) {
@@ -149,6 +170,7 @@ export function createTerminalPanel({ document, onStop = () => {}, onCopy = () =
     const running = !!(tab && tab.classList.contains("zs-t-running"));
     stopEl.hidden = !running;
     copyEl.hidden = !tab;
+    showMeta(key);
     scrollToEnd(key);
   }
 

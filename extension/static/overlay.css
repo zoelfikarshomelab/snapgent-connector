@@ -910,6 +910,11 @@ html.zs-light #zs-prefs-btn, html.zs-light #zs-files-btn, html.zs-light #zs-skil
 .zs-t-close:hover { opacity: 1; background: rgba(255, 255, 255, 0.08); }
 .zs-t-tabs { display: flex; gap: 6px; padding: 8px 10px; overflow-x: auto; border-bottom: 1px solid rgba(255, 255, 255, 0.07); scrollbar-width: thin; flex: none; }
 .zs-t-empty { opacity: 0.45; font-size: 11px; padding: 3px 4px; }
+/* The selected command in full (wrapped, never cut) and when it ran. */
+.zs-t-meta { flex: none; padding: 7px 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.07); max-height: 96px; overflow-y: auto; scrollbar-width: thin; }
+.zs-t-meta[hidden] { display: none; }
+.zs-t-cmd { white-space: pre-wrap; word-break: break-all; line-height: 1.4; font-size: 11.5px; color: #c7d2fe; }
+.zs-t-times { margin-top: 3px; opacity: 0.6; font-size: 10.5px; }
 .zs-t-tab {
   flex: none; display: inline-flex; align-items: center; gap: 6px; max-width: 240px;
   padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.09);
