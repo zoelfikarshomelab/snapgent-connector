@@ -34,7 +34,7 @@ jobs:
       tag: ${{ steps.version.outputs.tag }}
       snapshot_tag: ${{ steps.version.outputs.snapshot_tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - id: version
         run: |
           code="$(PYTHONPATH=server python3 -c 'from snapgent_bridge import BRIDGE_VERSION; print(BRIDGE_VERSION)')"
@@ -74,7 +74,7 @@ jobs:
     needs: [check-version, verify-snapshot]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Download the snapshot files
         env:
           GH_TOKEN: ${{ github.token }}

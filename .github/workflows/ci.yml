@@ -26,8 +26,8 @@ jobs:
       run:
         working-directory: extension
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: 22
           cache: npm
@@ -64,7 +64,7 @@ jobs:
         # The oldest version the README promises and the newest: a feature missing in 3.9 fails here, one removed in 3.14 too.
         python: ["3.9", "3.14"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # uv fetches the interpreter itself, so any version runs on any distribution (setup-python has no builds for the newest Ubuntu).
       - uses: astral-sh/setup-uv@v5
       - name: Configure git identity for the tests that make commits
@@ -82,7 +82,7 @@ jobs:
       matrix:
         python: ["3.9", "3.14"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
@@ -101,13 +101,13 @@ jobs:
       run:
         working-directory: server
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: python -m pip install pyinstaller websockets
       - run: pyinstaller --noconfirm snapgent.spec
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: snapgent-windows-example
           path: server/dist/snapgent.exe
@@ -159,7 +159,7 @@ jobs:
       run:
         working-directory: server
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v5
       - run: uv venv --python 3.12 "$RUNNER_TEMP/venv" && uv pip install --python "$RUNNER_TEMP/venv/bin/python" pyinstaller websockets
       - run: $RUNNER_TEMP/venv/bin/pyinstaller --noconfirm snapgent.spec
