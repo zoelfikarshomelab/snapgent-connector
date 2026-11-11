@@ -278,7 +278,7 @@ class ReportTests(unittest.TestCase):
 
     def test_the_first_answer_names_the_run_the_log_and_the_three_ways_to_go_on(self):
         text = handover_report(self.run_after(100), "line 1\nline 2", 1000, 100)
-        for part in ("Still running after 1 min 40 s", "NOT stopped", "run_id r9, pid 77", "/tmp/snapgent-r9-x.log", "line 2",
+        for part in ("Still running after 1 min 40 s", "NOT stopped", "run_id r9, pid 77", str(Path("/tmp/snapgent-r9-x.log")), "line 2",
                      '"command":"wait_command"', '"command":"get_command_output"', '"command":"stop_command"', "tail -f", "stopped by itself after 1 h 0 min"):
             self.assertIn(part, text)
         self.assertIn("(nothing printed yet)", handover_report(self.run_after(100), "", 1000, 100))

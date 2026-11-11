@@ -83,18 +83,31 @@ def child_environment() -> dict:
 def _drain_pipe(pipe, stream: str, events: "queue.Queue[_EVENT]", stop: threading.Event) -> None:
     """Read one pipe to the end, forwarding whatever arrives as it arrives (not line by line). The reader never blocks the process exit."""
     decoder = codecs.getincrementaldecoder("utf-8")(errors="replace")  # a character can be split between two reads
+    held = False  # a "\r" ended the last read: it may be the first half of a Windows line end
+
+    def lines(text: str) -> str:
+        """Windows programs end lines with \\r\\n; the bytes are read raw, so it is turned into \\n here. A lone \\r stays (progress bars use it)."""
+        nonlocal held
+        if held:
+            text, held = "\r" + text, False
+        if text.endswith("\r"):
+            text, held = text[:-1], True
+        return text.replace("\r\n", "\n")
+
     try:
         descriptor = pipe.fileno()
         while True:
             data = os.read(descriptor, READ_CHUNK_BYTES)
             if not data:
                 break
-            text = decoder.decode(data)
+            text = lines(decoder.decode(data))
             if text:
                 events.put((stream, text))
             if stop.is_set():
                 break
         rest = decoder.decode(b"", final=True)
+        if held:
+            rest = "\r" + rest
         if rest:
             events.put((stream, rest))
     except (OSError, ValueError):

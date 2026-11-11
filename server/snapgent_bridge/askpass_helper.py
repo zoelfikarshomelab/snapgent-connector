@@ -18,6 +18,8 @@ MAX_REPLY_BYTES = 8192
 
 def ask(path: str, token: str, prompt: str, hint: str) -> Optional[str]:
     """The answer, or None when the person cancelled (or the bridge refused)."""
+    if not hasattr(socket, "AF_UNIX"):  # Windows Python has none: fail like any unreachable bridge, so ssh just gets no answer
+        raise OSError("unix sockets are not available here")
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as connection:
         connection.settimeout(WAIT_SECONDS)
         connection.connect(path)
