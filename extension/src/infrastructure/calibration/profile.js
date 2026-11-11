@@ -17,6 +17,7 @@ export const PROFILE_VERSION = 1;
  * @property {{ selector: string }|null} stop    optional; otherwise found by label next to the composer
  * @property {{ chars?: number, calls?: number, asFile?: boolean }} [limits]   what this AI accepts: message size, commands per reply, and whether a message over the size goes as a file; absent = the general preferences
  * @property {{ selector: string }|null} [card]   optional: the box around the text box and its buttons; otherwise found by looking
+ * @property {{ selector: string }} [captcha]   optional: the site's bot-check puzzle; while it is on the page the extension plays a sound
  */
 
 /**
@@ -94,6 +95,13 @@ export function updateProfile(profile, role, picks) {
     if (!selector) return { error: "Could not describe that box in a way that finds it again." };
     return { profile: { ...profile, card: { selector } }, warnings };
   }
+  if (role === "captcha") {
+    // No pick removes the part again; the rest of the profile is untouched.
+    if (!picks.captcha) { const { captcha: _old, ...rest } = profile; return { profile: rest, warnings }; }
+    const selector = learnSelector(picks.captcha, { onlyVisible: true });
+    if (!selector) return { error: "Could not describe the bot check in a way that finds it again." };
+    return { profile: { ...profile, captcha: { selector } }, warnings };
+  }
   if (role === "limits") {
     // What this AI accepts: message size and commands per reply. Nothing set means the general preferences apply again.
     const { limits: _old, ...rest } = profile;
@@ -117,6 +125,7 @@ export function profileProblems(profile) {
   if (!profile.send || (typeof profile.send.selector !== "string" && profile.send.enter !== true)) problems.push("no send button and not Enter");
   if (!profile.assistant || typeof profile.assistant.turn !== "string") problems.push("no assistant turn selector");
   if (!profile.user || typeof profile.user.turn !== "string") problems.push("no user turn selector");
+  if (profile.captcha !== undefined && profile.captcha !== null && (typeof profile.captcha !== "object" || typeof profile.captcha.selector !== "string")) problems.push("captcha needs a selector");
   if (profile.limits !== undefined) {
     const { limits } = profile;
     const ok = (value) => value === undefined || (Number.isFinite(value) && value > 0);

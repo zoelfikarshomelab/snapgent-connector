@@ -3,7 +3,7 @@
 
 export const EDITABLE = 'textarea, input:not([type=button]):not([type=submit]):not([type=checkbox]):not([type=radio]), [contenteditable]:not([contenteditable="false"]), [role="textbox"]';
 const CLICKABLE = "button, [role=button], a, input[type=submit]";
-export const FLOWS = { all: ["composer", "send", "reply", "message"], composer: ["composer"], send: ["send"], reply: ["reply", "message"] };
+export const FLOWS = { all: ["composer", "send", "reply", "message"], composer: ["composer"], send: ["send"], reply: ["reply", "message"], captcha: ["captcha"] };
 export const PREVIEW_CHARS = 700;
 
 const shown = (el) => el.getClientRects().length > 0;
@@ -59,6 +59,11 @@ export const STEPS = {
     text: "Now click on the WORDS of a message that YOU sent in the same chat.",
     accept: (el, picks) => (picks.reply && (picks.reply === el || picks.reply.contains(el) || el.contains(picks.reply)) ? "That is part of the reply. Click one of your own messages." : null),
   },
+  captcha: {
+    text: "Click the bot-check puzzle while it is on the screen (its box or its frame).",
+    hint: "A sound will play whenever this appears again. Nothing else in the calibration changes.",
+    refine: (el) => el.closest('[role=dialog], [aria-modal=true], iframe') || el,
+  },
   answer: { text: "Click just the part of the AI reply that is the answer itself (not its labels or buttons)." },
   thinking: { text: "Click on the words of the AI's thinking (the “Thought process” box that sits inside the same reply)." },
   card: {
@@ -70,4 +75,4 @@ export const STEPS = {
 
 
 /** The label drawn on the page next to what was clicked at each step. */
-export const MARK_LABELS = { composer: "1 · Text box", send: "2 · Send button", reply: "3 · AI reply", message: "4 · Your message", answer: "Answer part", thinking: "Thinking", card: "Box around the text box" };
+export const MARK_LABELS = { composer: "1 · Text box", send: "2 · Send button", reply: "3 · AI reply", message: "4 · Your message", answer: "Answer part", thinking: "Thinking", card: "Box around the text box", captcha: "Bot check" };

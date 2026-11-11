@@ -60,6 +60,7 @@ export function createAtPopup({ document, window, root, state, settings, provide
       save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders, contextFiles: preferences.setContextFiles, asFile: preferences.setAsFile, startContext: preferences.setStartContext, startTree: preferences.setStartTree, site: calibration && calibration.setLimits },
       actions: {
         onCalibrate: () => calibration && calibration.open(null),
+        onCalibrateCaptcha: () => calibration && calibration.open("captcha"),
         onExportCal: calibration && calibration.exportProfile,
         onImportCal: calibration && calibration.importProfile,
         onCopyDiag: calibration && calibration.copyDiagnostics,

@@ -23,7 +23,7 @@ export function createCalibrationActions({ document, location, provider, state, 
   async function open(only) {
     if (wizard) wizard.cancel(false);
     wizard = createCalibrationWizard({
-      document, hostname: location.hostname, name: provider.displayName, current: await store.get(location.hostname),
+      document, hostname: location.hostname, name: provider.displayName, current: (await store.get(location.hostname)) || (only && provider.diagnose && provider.diagnose().profile) || null, // a site read with the shipped calibration redoes one part of a copy of it
       calibration: { learnProfile, updateProfile, createProvider: (profile) => createCalibratedProvider({ document, location, profile }) },
       onSave: (profile) => store.save(profile),
       describe: describeElement,

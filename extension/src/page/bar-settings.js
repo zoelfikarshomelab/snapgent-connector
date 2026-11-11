@@ -22,6 +22,7 @@ export function createBarSettings({ document, root, settings, serverDirectory, t
 
   const actions = () => ({
     onCalibrate: () => calibration.open(null),
+    onCalibrateCaptcha: () => calibration.open("captcha"),
     onExportCal: calibration.exportProfile,
     onImportCal: calibration.importProfile,
     onCopyDiag: calibration.copyDiagnostics,

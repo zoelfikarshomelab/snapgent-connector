@@ -16,6 +16,7 @@ import { createBar } from "../page/bar.js";
 import { createBatchJobs } from "../page/batch-jobs.js";
 import { createBridgeStatus } from "../page/bridge-status.js";
 import { createCalibrationActions } from "../page/calibration-actions.js";
+import { createCaptchaAlert } from "../page/captcha-alert.js";
 import { createChat } from "../page/chat.js";
 import { createDiagnostics, watchForStalls } from "../page/diagnostics.js";
 import { createExtensionBridge } from "../page/extension-bridge.js";
@@ -113,6 +114,7 @@ userInput = installUserInput({ document, state, provider, bar, resend, loop, tak
 createAtPopup({ document, window, root: bar.root, state, settings, provider, attachments, preferences, calibration, toast: bar.toast, diag });
 createAutoResume({ document, state, provider, executed, loop, diag });
 startPageWatch({ document, window, provider, session, bar, agentMode });
+createCaptchaAlert({ provider, window, toast: (text) => bar.toast(text), diag }).start();
 // The popup asks before it switches logins: a running agent would be left talking to a session that is no longer there.
 try {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

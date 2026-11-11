@@ -476,6 +476,9 @@ export function createCalibratedProvider({ document, location, profile, diag = (
     enforceComposer: () => ({ ready: !!getEditor() }), ensureComposerReady: async () => ({ ready: !!getEditor() }),
     typeAndSend, writeText: writeComposer, attachFile,
 
+    // The bot-check puzzle taught in calibration (optional): true while it is laid out on the page.
+    captchaPresent: () => !!(profile.captcha && profile.captcha.selector && find(profile.captcha.selector).some(shown)),
+
     scanError: () => null, isTooLongMsg: () => false, isBusyMsg: () => false,
     findContinueBtn: () => null, clickContinueBtn: () => false,
   };
