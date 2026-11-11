@@ -1,6 +1,7 @@
 name: CI
 
 # The only place the checks run: a release (tag) trusts the green run of the commit it points at and does not repeat them.
+# The security audit gates everything: no other job runs until it passes. If it fails, the rest are skipped and the run fails.
 on:
   push:
     branches: [main]
@@ -17,6 +18,7 @@ concurrency:
 jobs:
   extension:
     name: Extension (lint, test, build)
+    needs: security
     runs-on: [self-hosted, linux]
     # A pull request from a fork never runs on the self-hosted machine; the jobs on GitHub's own runners still do.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -52,6 +54,7 @@ jobs:
 
   python:
     name: Python ${{ matrix.python }} on Linux
+    needs: security
     runs-on: [self-hosted, linux]
     # A pull request from a fork never runs on the self-hosted machine; the jobs on GitHub's own runners still do.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
@@ -72,6 +75,7 @@ jobs:
 
   python-windows:
     name: Python ${{ matrix.python }} on Windows
+    needs: security
     runs-on: windows-latest   # GitHub's own runner: there is no Windows machine of ours
     strategy:
       fail-fast: false
@@ -91,6 +95,7 @@ jobs:
 
   frozen:
     name: Windows program builds and starts
+    needs: security
     runs-on: windows-latest
     defaults:
       run:
@@ -146,6 +151,7 @@ jobs:
 
   frozen-linux:
     name: Linux program builds and starts
+    needs: security
     runs-on: [self-hosted, linux]
     # A pull request from a fork never runs on the self-hosted machine; the jobs on GitHub's own runners still do.
     if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
