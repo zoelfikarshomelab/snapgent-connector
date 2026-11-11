@@ -17,9 +17,11 @@ export function createAutoResume({ document, state, provider, executed, loop, di
     if (!state.started || state.running || state.starting || state.injecting) return skip(`state started=${state.started} running=${state.running} starting=${state.starting} injecting=${state.injecting}`);
     if (state.discuss) return skip("discuss");
     if (document.hidden) return skip("hidden");
+    if (state.captcha) return skip("captcha");
     if (state.userStopped) return skip("userStopped");
     if (provider.isGenerating()) return skip("generating");
-    if (Date.now() - state.lastGenAt > FRESH_MS) return skip("stale");
+    // With the watch switch on the site has no reliable "generating" signal, so lastGenAt never moves: freshness cannot be judged by it.
+    if (!state.patient && Date.now() - state.lastGenAt > FRESH_MS) return skip("stale");
     const item = provider.lastAssistant();
     if (!item || item.dataset.zloop) return skip(item ? "zloop" : "noItem");
     if (state.bootBaselineId && provider.lastAssistantId && provider.lastAssistantId() === state.bootBaselineId) return skip("bootBaseline");

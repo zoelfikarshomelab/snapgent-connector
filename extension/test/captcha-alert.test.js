@@ -40,6 +40,18 @@ describe("bot check alert", () => {
     assert.equal(state.beeps, 3, "a new appearance beeps at once");
   });
 
+  test("an hCaptcha frame is found without calibration, and state.captcha follows it", () => {
+    const frame = { isConnected: true, getClientRects: () => [{}], getBoundingClientRect: () => ({ width: 300, height: 380 }) };
+    let frames = [frame];
+    const state = { captcha: false };
+    const alert = createCaptchaAlert({ provider: {}, window: {}, document: { querySelectorAll: () => frames }, state, beep: () => {}, toast: () => {} });
+    assert.equal(alert.tick(), true);
+    assert.equal(state.captcha, true);
+    frames = [];
+    assert.equal(alert.tick(), false);
+    assert.equal(state.captcha, false);
+  });
+
   test("a provider without the part (not calibrated) does nothing", () => {
     const alert = createCaptchaAlert({ provider: {}, window: {}, beep: () => assert.fail("no beep") });
     assert.equal(alert.tick(), false);

@@ -28,6 +28,7 @@ export const createState = () => ({
 
   // What the site is doing.
   lastGenAt: 0,
+  captcha: false, // a bot check is on screen (set by page/captcha-alert.js): the agent parks until it is gone and touches nothing
   maxTurnId: null,
   sendToken: undefined, // the last reply's identity before our send
 

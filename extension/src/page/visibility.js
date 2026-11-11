@@ -19,16 +19,18 @@ export async function waitFor(predicate, timeoutMs) {
 
 /** @param {{ document: Document, state: object, diag: Function, onParkChange: () => void }} deps */
 export function createVisibility({ document, state, diag, onParkChange }) {
+  // A bot check on screen parks the agent exactly like a background tab: nothing is read, typed or run until it is solved (then it resumes by itself).
+  const blocked = () => document.hidden || !!state.captcha;
   /** Resolves false ONLY if the user stopped while parked, so the caller can break out. */
   async function waitVisible() {
-    if (!document.hidden || state.stop) return !state.stop;
+    if (!blocked() || state.stop) return !state.stop;
     state.parked = true;
     onParkChange();
     try {
       await new Promise((resolve) => {
         let poll = 0;
         const check = () => {
-          if (!state.stop && document.hidden) return;
+          if (!state.stop && blocked()) return;
           document.removeEventListener("visibilitychange", check);
           clearInterval(poll);
           resolve();
@@ -49,7 +51,7 @@ export function createVisibility({ document, state, diag, onParkChange }) {
    * becomes "no response from the site".
    */
   async function parkHidden() {
-    if (!document.hidden || state.stop) return 0;
+    if (!blocked() || state.stop) return 0;
     const start = Date.now();
     await waitVisible();
     const parked = Date.now() - start;
@@ -58,5 +60,5 @@ export function createVisibility({ document, state, diag, onParkChange }) {
     return parked;
   }
 
-  return { isHidden: () => document.hidden, waitUntilVisible: waitVisible, parkHidden };
+  return { isHidden: blocked, waitUntilVisible: waitVisible, parkHidden };
 }

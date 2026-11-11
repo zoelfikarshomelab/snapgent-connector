@@ -29,21 +29,39 @@ export function defaultBeep(win) {
  *           now?: () => number, intervalMs?: number, repeatMs?: number }} deps
  * @returns {{ start: () => void, stop: () => void, tick: () => boolean }}
  */
-export function createCaptchaAlert({ provider, window, toast = () => {}, diag = () => {}, beep = defaultBeep(window), now = Date.now, intervalMs = 1000, repeatMs = 4000 }) {
+// hCaptcha's puzzle frame: found without any calibration, so the pause works on a site that was never calibrated too.
+const HCAPTCHA_FRAME = 'iframe[src*="hcaptcha.com"][src*="frame=challenge"]';
+
+export function createCaptchaAlert({ provider, window, document = null, state = null, toast = () => {}, diag = () => {}, beep = defaultBeep(window), now = Date.now, intervalMs = 500, repeatMs = 4000 }) {
   let was = false;
   let lastBeep = 0;
   let timer = null;
 
+  function builtInPresent() {
+    if (!document) return false;
+    try {
+      return [...document.querySelectorAll(HCAPTCHA_FRAME)].some((el) => {
+        if (!el.isConnected || !el.getClientRects().length) return false;
+        if (typeof el.checkVisibility === "function" && !el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true })) return false;
+        const box = el.getBoundingClientRect();
+        return box.width > 50 && box.height > 50;
+      });
+    } catch { return false; }
+  }
+
   function tick() {
     let present = false;
     try { present = !!(provider.captchaPresent && provider.captchaPresent()); } catch { /* the page is changing */ }
+    present = present || builtInPresent();
+    if (state) state.captcha = present; // set first: everything that acts on the page checks it
     if (present) {
-      if (!was) { diag("captcha.appeared", {}); toast("Bot check detected: solve the puzzle."); }
+      if (!was) { diag("captcha.appeared", {}); toast("Bot check detected: the agent is paused until you solve it."); }
       if (!was || now() - lastBeep >= repeatMs) {
         lastBeep = now();
         try { beep(); } catch { /* no audio here */ }
       }
     }
+    if (was && !present) { diag("captcha.gone", {}); toast("Bot check done: continuing."); }
     was = present;
     return present;
   }

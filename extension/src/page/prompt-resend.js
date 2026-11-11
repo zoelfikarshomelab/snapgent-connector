@@ -28,7 +28,7 @@ export function createPromptResend({ provider, state, storage, systemPrompt, lim
 
   setInterval(async () => {
     if (!resender.due() || !state.started || state.running || state.starting || state.injecting || state.discuss) return;
-    if (document.hidden || state.userStopped || provider.isGenerating()) return;
+    if (document.hidden || state.captcha || state.userStopped || provider.isGenerating()) return;
     try { if ((provider.editorText() || "").trim() !== "") return; } catch { return; }
     if (Date.now() - state.lastGenAt < FALLBACK_IDLE_MS) return; // give the free path (riding on a result) a fair chance first
     resender.claim("ownTurn");

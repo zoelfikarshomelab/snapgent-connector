@@ -115,7 +115,7 @@ userInput = installUserInput({ document, state, provider, bar, resend, loop, tak
 createAtPopup({ document, window, root: bar.root, state, settings, provider, attachments, preferences, calibration, toast: bar.toast, diag });
 createAutoResume({ document, state, provider, executed, loop, diag });
 startPageWatch({ document, window, provider, session, bar, agentMode });
-createCaptchaAlert({ provider, window, toast: (text) => bar.toast(text), diag }).start();
+createCaptchaAlert({ provider, window, document, state, toast: (text) => bar.toast(text), diag }).start();
 // The popup asks before it switches logins: a running agent would be left talking to a session that is no longer there.
 try {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {

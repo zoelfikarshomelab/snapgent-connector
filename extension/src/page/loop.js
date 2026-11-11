@@ -71,7 +71,7 @@ export function createLoop({ state, provider, tools, chat, bar, visibility, exec
     // Nothing observable changing while the tab is visible and no tool runs means the loop is stuck.
     activity: {
       signature: () => [provider.assistantCount(), provider.userCount(), provider.streamLen(), provider.isGenerating() ? 1 : 0].join("|"),
-      isPaused: () => document.hidden || state.parked || state.toolRunning || state.injecting,
+      isPaused: () => document.hidden || state.captcha || state.parked || state.toolRunning || state.injecting,
     },
     timers: window,
     displayName: () => provider.displayName,
