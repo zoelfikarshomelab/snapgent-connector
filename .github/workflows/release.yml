@@ -1,19 +1,21 @@
 name: Release
 
-# Release = build only. The checks already ran in CI when the commit was pushed to main, so a tag does not repeat them;
+# Release = clean release only. The checks already ran in CI when the commit was pushed to main, so a tag does not repeat them;
 # it only refuses to build a commit whose CI run on main is not green.
 #
-#   v3.9.4            a release.
-#   v3.9.4-2d400bf    a pre-release (snapshot): the same version plus the short hash of the tagged commit.
-#   manual (Actions -> Release -> Run workflow)  a snapshot pre-release: the tag is made from the code version + the commit hash.
+#   v3.9.43   a release (clean version, no suffix).
 #
-# The version part must match the version in the code; a hash that is not the tagged commit is refused.
-# Flow: push to main -> CI green -> run this workflow by hand if a snapshot is needed.
-# If the snapshot is not OK, fix, push again, wait for CI, run again. When the last snapshot is OK, tag v<version> for the real release.
+# Pre-releases are NOT here. Use the Snapshot workflow for those:
+#   Actions -> Snapshot -> Run workflow -> branch main
+#   publishes v3.9.43-<short hash> as a pre-release. Many snapshots can share
+#   the same version, each one is just a different commit. No version lock.
+# When one snapshot is good, tag v<version> to make the real release here.
+#
+# The tag version must match the version in the code. A tag with a suffix
+# (e.g. v3.9.43-abc1234) is refused - run Snapshot instead.
 on:
   push:
     tags: ["v*"]
-  workflow_dispatch:
 
 permissions:
   contents: write
@@ -24,40 +26,22 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
-      prerelease: ${{ steps.version.outputs.prerelease }}
     steps:
       - uses: actions/checkout@v4
       - id: version
         run: |
           code="$(PYTHONPATH=server python3 -c 'from snapgent_bridge import BRIDGE_VERSION; print(BRIDGE_VERSION)')"
-          if [ "${{ github.ref_type }}" = "tag" ]; then
-            name="${GITHUB_REF_NAME#v}"
-            tag="${name%%-*}"
-            suffix="${name#"$tag"}"
-            if [ "$tag" != "$code" ]; then
-              echo "Tag v$tag does not match the version in the code ($code)." >&2
-              exit 1
-            fi
-            if [ -n "$suffix" ]; then
-              hash="${suffix#-}"
-              if ! printf '%s' "$hash" | grep -Eq '^[0-9a-f]{7,40}$' || [ "${GITHUB_SHA#"$hash"}" = "$GITHUB_SHA" ]; then
-                echo "A pre-release tag must look like v$tag-<hash of the tagged commit>; the commit is ${GITHUB_SHA::7}." >&2
-                exit 1
-              fi
-              prerelease=true
-            else
-              prerelease=false
-            fi
-            release_tag="$GITHUB_REF_NAME"
-          else
-            tag="$code"
-            prerelease=true
-            release_tag="v$tag-${GITHUB_SHA::7}"
-            echo "Manual snapshot: will publish $release_tag from $GITHUB_SHA."
+          name="${GITHUB_REF_NAME#v}"
+          if [ "$name" != "${name%%-*}" ]; then
+            echo "Release tags must be clean (v$code). Tag $GITHUB_REF_NAME has a suffix - use Actions -> Snapshot -> Run workflow for pre-releases." >&2
+            exit 1
           fi
-          echo "version=$tag" >> "$GITHUB_OUTPUT"
-          echo "tag=$release_tag" >> "$GITHUB_OUTPUT"
-          echo "prerelease=$prerelease" >> "$GITHUB_OUTPUT"
+          if [ "$name" != "$code" ]; then
+            echo "Tag v$name does not match the version in the code ($code)." >&2
+            exit 1
+          fi
+          echo "version=$name" >> "$GITHUB_OUTPUT"
+          echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
 
   verify-ci:
     name: CI is green on this commit
@@ -176,13 +160,5 @@ jobs:
         run: |
           v="${{ needs.check-version.outputs.version }}"
           tag="${{ needs.check-version.outputs.tag }}"
-          flags=""
-          if [ "${{ needs.check-version.outputs.prerelease }}" = "true" ]; then flags="--prerelease"; fi
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            gh release delete "$tag" --yes --cleanup-tag || true
-            gh release create "$tag" "out/snapgent.exe" "out/snapgent-extension-v$v.zip" "out/snapgent-linux-x64-v$v.tar.gz" \
-              --title "snapgent $tag" --notes-file CHANGELOG.md --target "$GITHUB_SHA" $flags
-          else
-            gh release create "$tag" "out/snapgent.exe" "out/snapgent-extension-v$v.zip" "out/snapgent-linux-x64-v$v.tar.gz" \
-              --title "snapgent $tag" --notes-file CHANGELOG.md --verify-tag $flags
-          fi
+          gh release create "$tag" "out/snapgent.exe" "out/snapgent-extension-v$v.zip" "out/snapgent-linux-x64-v$v.tar.gz" \
+            --title "snapgent $tag" --notes-file CHANGELOG.md --verify-tag

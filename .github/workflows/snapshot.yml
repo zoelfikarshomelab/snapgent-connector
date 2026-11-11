@@ -1,0 +1,150 @@
+name: Snapshot
+
+# Snapshot = pre-release from a commit on main, manual only.
+# Push to main only runs CI (checks). If CI is green and a build is needed,
+# run this by hand: Actions -> Snapshot -> Run workflow -> branch main.
+# It publishes v<version>-<short hash> as a pre-release, e.g. v3.9.43-abc1234.
+# The version never changes while snapshotting: many snapshots can share 3.9.43,
+# each one is just a different commit. No version lock here.
+# When one snapshot is good, tag v<version> (clean, no suffix) to make the real release.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: version
+        run: |
+          code="$(PYTHONPATH=server python3 -c 'from snapgent_bridge import BRIDGE_VERSION; print(BRIDGE_VERSION)')"
+          tag="v$code-${GITHUB_SHA::7}"
+          echo "Snapshot: will publish $tag from $GITHUB_SHA."
+          echo "version=$code" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+  verify-ci:
+    name: CI is green on this commit
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          for _ in $(seq 1 60); do
+            run="$(gh run list --workflow ci.yml --branch main --event push --commit "$GITHUB_SHA" --limit 1 \
+              --json status,conclusion,url --jq '.[] | "\(.status) \(.conclusion) \(.url)"')"
+            if [ -z "$run" ]; then
+              echo "No CI run on main for ${GITHUB_SHA::7} yet."
+            else
+              read -r status conclusion url <<< "$run"
+              echo "CI run: $status ($conclusion) $url"
+              if [ "$status" = "completed" ]; then
+                if [ "$conclusion" = "success" ]; then exit 0; fi
+                echo "CI is not green on this commit ($conclusion): not snapshotting." >&2
+                exit 1
+              fi
+            fi
+            sleep 30
+          done
+          echo "No finished CI run on main for ${GITHUB_SHA::7}: push the commit to main and wait for CI before snapshotting." >&2
+          exit 1
+
+  extension:
+    needs: [check-version, verify-ci]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: extension
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: extension/package-lock.json
+      - run: npm ci
+      - run: npm run build
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension-dist
+          path: extension/dist
+          if-no-files-found: error
+
+  windows-binaries:
+    needs: [check-version, verify-ci]
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pyinstaller websockets
+      - run: pyinstaller --noconfirm snapgent.spec
+        working-directory: server
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-binary
+          path: server/dist/snapgent.exe
+          if-no-files-found: error
+
+  linux-binary:
+    needs: [check-version, verify-ci]
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install pyinstaller websockets
+      - run: pyinstaller --noconfirm snapgent.spec
+        working-directory: server
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-binary
+          path: server/dist/snapgent
+          if-no-files-found: error
+
+  publish:
+    needs: [check-version, extension, windows-binaries, linux-binary]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension-dist
+          path: extension-dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: windows-binary
+          path: windows-binary
+      - uses: actions/download-artifact@v4
+        with:
+          name: linux-binary
+          path: linux-binary
+      - name: Assemble the snapshot
+        run: >
+          python3 scripts/package_release.py
+          --version "${{ needs.check-version.outputs.version }}"
+          --extension-dist extension-dist
+          --windows-binary windows-binary/snapgent.exe
+          --linux-binary linux-binary/snapgent
+          --out out
+      - name: Publish snapshot
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          v="${{ needs.check-version.outputs.version }}"
+          tag="${{ needs.check-version.outputs.tag }}"
+          gh release delete "$tag" --yes --cleanup-tag || true
+          gh release create "$tag" "out/snapgent.exe" "out/snapgent-extension-v$v.zip" "out/snapgent-linux-x64-v$v.tar.gz" \
+            --title "snapgent $tag" --notes-file CHANGELOG.md --target "$GITHUB_SHA" --prerelease
