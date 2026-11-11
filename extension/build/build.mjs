@@ -8,7 +8,7 @@ import { TARGETS, buildManifest } from "./manifest.mjs";
 import { tutorialPlugin } from "./tutorial.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
-const pkg = JSON.parse(await readFile(join(root, "package.json"), "utf8"));
+const version = (await readFile(join(root, "..", "VERSION"), "utf8")).trim(); // the one place the version is written
 const base = JSON.parse(await readFile(join(root, "manifests/base.json"), "utf8"));
 
 const arg = process.argv[2] || "all";
@@ -37,7 +37,7 @@ for (const target of targets) {
 
   await cp(join(root, "static"), out, { recursive: true });
 
-  const manifest = buildManifest(base, { target, version: pkg.version });
+  const manifest = buildManifest(base, { target, version });
   await writeFile(join(out, "manifest.json"), JSON.stringify(manifest, null, 2) + "\n");
-  console.log(`built dist/${target} (v${pkg.version})`);
+  console.log(`built dist/${target} (v${version})`);
 }

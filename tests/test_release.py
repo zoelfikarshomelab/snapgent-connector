@@ -7,7 +7,7 @@ import unittest
 import zipfile
 from pathlib import Path
 
-from scripts import package_release as pr
+from scripts import package_release as pr, set_version as sv
 import subprocess
 
 from snapgent_bridge import BRIDGE_VERSION
@@ -75,7 +75,7 @@ class RepositoryLayoutTests(unittest.TestCase):
     """The repository root stays a table of contents, not a drawer. Add a folder here only on purpose."""
 
     ALLOWED_ROOT = {
-        ".gitattributes", ".gitignore", "AGENTS.md", "CHANGELOG.md", "LICENSE", "README.md",
+        ".gitattributes", ".gitignore", "AGENTS.md", "CHANGELOG.md", "LICENSE", "README.md", "VERSION",
         ".github", ".snapgent", "assets", "docs", "extension", "scripts", "server", "tests",
     }
 
@@ -106,9 +106,37 @@ class RepositoryLayoutTests(unittest.TestCase):
 class VersionTests(unittest.TestCase):
     """The version appears in several places; a release with disagreeing numbers confuses users and the popup."""
 
-    def test_extension_and_bridge_versions_agree(self):
+    def test_the_version_file_is_the_source_of_the_bridge_and_the_package(self):
+        version = (REPO / "VERSION").read_text(encoding="utf-8").strip()
+        self.assertEqual(BRIDGE_VERSION, version)
         package = json.loads((REPO / "extension" / "package.json").read_text(encoding="utf-8"))
-        self.assertEqual(package["version"], BRIDGE_VERSION)
+        self.assertEqual(package["version"], version)
+
+    def test_set_version_rewrites_every_place_that_repeats_the_version(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            repo = Path(tmp)
+            (repo / "extension").mkdir()
+            (repo / "docs").mkdir()
+            (repo / "VERSION").write_text("3.9.4\n", encoding="utf-8")
+            (repo / "extension" / "package.json").write_text('{\n  "version": "3.9.4"\n}\n', encoding="utf-8")
+            (repo / "extension" / "package-lock.json").write_text(
+                '{\n  "version": "3.9.4",\n  "packages": {\n    "": {\n      "version": "3.9.4"\n    },\n    "node_modules/x": {\n      "version": "3.9.4"\n    }\n  }\n}\n', encoding="utf-8")
+            (repo / "README.md").write_text("RELEASE-V3.9.4 and releases/tag/V3.9.4\n", encoding="utf-8")
+            (repo / "docs" / "index.html").write_text("<p>Latest release: V3.9.</p>", encoding="utf-8")
+            changed = sv.set_version(repo, "4.0.1")
+            self.assertEqual(sorted(changed), ["README.md", "VERSION", "docs/index.html", "extension/package-lock.json", "extension/package.json"])
+            self.assertEqual((repo / "VERSION").read_text(encoding="utf-8"), "4.0.1\n")
+            self.assertEqual(json.loads((repo / "extension" / "package.json").read_text(encoding="utf-8"))["version"], "4.0.1")
+            lock = json.loads((repo / "extension" / "package-lock.json").read_text(encoding="utf-8"))
+            self.assertEqual((lock["version"], lock["packages"][""]["version"]), ("4.0.1", "4.0.1"))
+            self.assertEqual(lock["packages"]["node_modules/x"]["version"], "3.9.4", "a dependency's version is not ours")
+            self.assertEqual((repo / "README.md").read_text(encoding="utf-8"), "RELEASE-V4.0.1 and releases/tag/V4.0.1\n")
+            self.assertIn("Latest release: V4.0.1.", (repo / "docs" / "index.html").read_text(encoding="utf-8"))
+            self.assertEqual(sv.set_version(repo, "4.0.1"), [], "running it again changes nothing")
+
+    def test_set_version_refuses_a_version_that_is_not_three_numbers(self):
+        with self.assertRaises(ValueError):
+            sv.set_version(REPO, "3.10")
 
     def test_the_readme_badge_and_download_links_name_that_version(self):
         readme = (REPO / "README.md").read_text(encoding="utf-8")
