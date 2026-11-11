@@ -76,7 +76,7 @@ def server_id(target: SshTarget) -> str:
     slug = re.sub(r"[^A-Za-z0-9._-]+", "-", target.label.replace("@", "-")).strip("-")
     name = f"ssh-{slug}"
     if len(name) > SERVER_ID_MAX:
-        digest = hashlib.sha1(target.label.encode("utf-8")).hexdigest()[:8]
+        digest = hashlib.sha1(target.label.encode("utf-8"), usedforsecurity=False).hexdigest()[:8]
         name = f"{name[:SERVER_ID_MAX - 9]}-{digest}"
     return name
 

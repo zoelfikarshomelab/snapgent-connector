@@ -90,7 +90,9 @@ class SshSession:
         """Sign in. `ask` is how ssh reaches the person (passphrase, new host); it returns None when they cancel."""
         if self._master is not None:
             raise SshError("This connection is already open.")
-        self._dir = Path(tempfile.mkdtemp(prefix="sg-", dir="/tmp" if os.path.isdir("/tmp") else None))
+        # /tmp on purpose: the default temp folder can be so long (macOS) that the control socket path would pass the unix limit.
+        # mkdtemp makes a fresh, random, owner-only folder, so a fixed parent is safe.
+        self._dir = Path(tempfile.mkdtemp(prefix="sg-", dir="/tmp" if os.path.isdir("/tmp") else None))  # nosec B108
         try:
             self._broker = AskpassBroker(ask, self._log)
             extra = await self._broker.start(self._dir, askpass_command())

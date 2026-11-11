@@ -34,6 +34,19 @@ jobs:
       - name: Both browsers were built
         run: test -f dist/chrome/manifest.json && test -f dist/firefox/manifest.json
 
+  security:
+    name: Security audit
+    # GitHub's own runner, not the self-hosted machine: the audit downloads its tools (bandit, pip-audit) and needs no secrets.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2
+      # The same script you run before pushing: npm audit, pip-audit, bandit and a secret scan.
+      - run: ./scripts/audit.sh
+
   python:
     name: Python ${{ matrix.python }} on Linux
     runs-on: [self-hosted, linux]
