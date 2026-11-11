@@ -1,7 +1,12 @@
 name: Release
 
-# Push a tag like v3.9.4 to build and publish a release. The tag must match the version in the code;
-# a suffix (v3.9.4-beta1) makes it a pre-release.
+# Release = build only. The checks already ran in CI when the commit was pushed to main, so a tag does not repeat them;
+# it only refuses to build a commit whose CI run on main is not green.
+#
+#   v3.9.4            a release.
+#   v3.9.4-2d400bf    a pre-release (snapshot): the same version plus the short hash of the tagged commit.
+#
+# The version part must match the version in the code; a hash that is not the tagged commit is refused.
 on:
   push:
     tags: ["v*"]
@@ -18,17 +23,56 @@ jobs:
       - uses: actions/checkout@v4
       - id: version
         run: |
-          tag="${GITHUB_REF_NAME#v}"
-          tag="${tag%%-*}"
+          name="${GITHUB_REF_NAME#v}"
+          tag="${name%%-*}"
+          suffix="${name#"$tag"}"
           code="$(PYTHONPATH=server python3 -c 'from snapgent_bridge import BRIDGE_VERSION; print(BRIDGE_VERSION)')"
           if [ "$tag" != "$code" ]; then
             echo "Tag v$tag does not match the version in the code ($code)." >&2
             exit 1
           fi
+          if [ -n "$suffix" ]; then
+            hash="${suffix#-}"
+            if ! printf '%s' "$hash" | grep -Eq '^[0-9a-f]{7,40}$' || [ "${GITHUB_SHA#"$hash"}" = "$GITHUB_SHA" ]; then
+              echo "A pre-release tag must look like v$tag-<hash of the tagged commit>; the commit is ${GITHUB_SHA::7}." >&2
+              exit 1
+            fi
+          fi
           echo "version=$tag" >> "$GITHUB_OUTPUT"
 
+  verify-ci:
+    name: CI is green on this commit
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+    steps:
+      # The tag is often pushed right after main, so the CI run may still be going: wait for it (up to 30 minutes).
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          for _ in $(seq 1 60); do
+            run="$(gh run list --workflow ci.yml --branch main --event push --commit "$GITHUB_SHA" --limit 1 \
+              --json status,conclusion,url --jq '.[] | "\(.status) \(.conclusion) \(.url)"')"
+            if [ -z "$run" ]; then
+              echo "No CI run on main for ${GITHUB_SHA::7} yet."
+            else
+              read -r status conclusion url <<< "$run"
+              echo "CI run: $status ($conclusion) $url"
+              if [ "$status" = "completed" ]; then
+                if [ "$conclusion" = "success" ]; then exit 0; fi
+                echo "CI is not green on this commit ($conclusion): not releasing." >&2
+                exit 1
+              fi
+            fi
+            sleep 30
+          done
+          echo "No finished CI run on main for ${GITHUB_SHA::7}: push the commit to main and wait for CI before tagging." >&2
+          exit 1
+
   extension:
-    needs: check-version
+    needs: [check-version, verify-ci]
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -41,8 +85,6 @@ jobs:
           cache: npm
           cache-dependency-path: extension/package-lock.json
       - run: npm ci
-      - run: npm run lint
-      - run: npm test
       - run: npm run build
       - uses: actions/upload-artifact@v4
         with:
@@ -51,7 +93,7 @@ jobs:
           if-no-files-found: error
 
   windows-binaries:
-    needs: check-version
+    needs: [check-version, verify-ci]
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -59,11 +101,6 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install pyinstaller websockets
-      - name: Configure git identity for the tests that make commits
-        run: |
-          git config --global user.name "CI"
-          git config --global user.email "ci@example.invalid"
-      - run: python -m unittest discover -s tests -t .
       - run: pyinstaller --noconfirm snapgent.spec
         working-directory: server
       - uses: actions/upload-artifact@v4
@@ -73,7 +110,7 @@ jobs:
           if-no-files-found: error
 
   linux-binary:
-    needs: check-version
+    needs: [check-version, verify-ci]
     runs-on: ubuntu-22.04   # built on an older glibc so the program runs on older distributions too
     steps:
       - uses: actions/checkout@v4
@@ -81,19 +118,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install pyinstaller websockets
-      - name: Configure git identity for the tests that make commits
-        run: |
-          git config --global user.name "CI"
-          git config --global user.email "ci@example.invalid"
-      - run: python -m unittest discover -s tests -t .
       - run: pyinstaller --noconfirm snapgent.spec
         working-directory: server
-      - name: The program starts and answers as the Snapgent MCP server
-        working-directory: server
-        run: |
-          ./dist/snapgent --version
-          echo '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
-            | timeout 20 ./dist/snapgent --mcp | grep -q '"serverInfo"'
       - uses: actions/upload-artifact@v4
         with:
           name: linux-binary

@@ -1,8 +1,11 @@
 name: CI
 
+# The only place the checks run: a release (tag) trusts the green run of the commit it points at and does not repeat them.
 on:
   push:
+    branches: [main]
   pull_request:
+    branches: [main]
 
 permissions:
   contents: read
