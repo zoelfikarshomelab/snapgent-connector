@@ -4,6 +4,8 @@ All notable changes to snapgentV3 Free are documented here.
 
 ## [Unreleased]
 
+## [V3.9.43] - 2026-11-11
+
 ### Security
 - **`sudo` and other privilege escalation now always asks for approval, also in Auto.** Auto (the server's `trusted` mode) used to approve every command before looking at it, so `sudo` ran with no prompt. A command that runs as another user (`sudo`, `sudoedit`, `su`, `doas`, `pkexec`, `runuser`, `runas`) now needs the user's approval in Manual and in Auto, even when the name is on the `SNAPGENT_ALLOWED_COMMANDS` list. It is also found inside a shell or wrapper program (`bash -lc "sudo ..."`, `env sudo ...`, `timeout 5 sudo ...`, `xargs`, `nohup` and similar). The check is deliberately blunt: a false alarm costs one click, a miss gives the model root. Plan mode still refuses every command. The logic is `escalates_privileges()` in `security/commands.py`, called from `security/decision.py` before the Auto shortcut.
 
