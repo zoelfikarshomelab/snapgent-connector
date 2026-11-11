@@ -8,6 +8,7 @@ import { createCalibrationWizard, openCalibrationImport, downloadText, chooseTex
 import { learnProfile, profileProblems, updateProfile, createCalibratedProvider } from "../infrastructure/calibration/index.js";
 import { describeElement } from "../infrastructure/chat/index.js";
 import { loremIpsum } from "../domain/prompt/lorem.js";
+import { defaultBeep } from "./captcha-alert.js";
 
 /** @param {{ document: Document, location: Location, provider: object, state: object, storage: object, settings: object, toast: (text: string) => void, previewStartMessage?: () => Promise<string|null>, previewReminderMessage?: () => Promise<string|null> }} deps */
 export function createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast, previewStartMessage = null, previewReminderMessage = null }) {
@@ -132,6 +133,16 @@ export function createCalibrationActions({ document, location, provider, state, 
     } catch (error) { toast(String((error && error.message) || error)); }
   }
 
+  /** Plays the bot check sound right now, so the user can hear that it works without a calibration or a puzzle. */
+  let testBeep = null;
+  function testCaptchaSound() {
+    try {
+      testBeep = testBeep || defaultBeep(document.defaultView);
+      testBeep();
+      toast("Playing the bot check sound. No sound? Check the tab is not muted and the volume is up.");
+    } catch { toast("Could not play a sound in this page."); }
+  }
+
   async function remove() {
     await store.remove(location.hostname);
     toast("Calibration removed.");
@@ -160,5 +171,5 @@ export function createCalibrationActions({ document, location, provider, state, 
   // undefined: not calibrated, so nothing to keep them in; null: calibrated, no values of its own.
   const limits = () => (provider.needsCalibration ? undefined : provider.limits || null);
 
-  return { limits, setLimits, copyTestText, fillTestText, fillStartMessage, fillReminderMessage, attachTestFile, open, exportProfile, importProfile, exportAll, importAll, remove, copyDiagnostics };
+  return { testCaptchaSound, limits, setLimits, copyTestText, fillTestText, fillStartMessage, fillReminderMessage, attachTestFile, open, exportProfile, importProfile, exportAll, importAll, remove, copyDiagnostics };
 }

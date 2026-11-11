@@ -2,7 +2,7 @@
 // Plays a sound when the site's bot check (the "captcha" part of the calibration) shows up, so the user notices it and solves it
 // by hand. Sound only: it never touches the puzzle. It repeats while the puzzle stays, until it is gone.
 
-function defaultBeep(win) {
+export function defaultBeep(win) {
   let ctx = null;
   return () => {
     const Ctor = win.AudioContext || win.webkitAudioContext;

@@ -61,6 +61,7 @@ export function createAtPopup({ document, window, root, state, settings, provide
       actions: {
         onCalibrate: () => calibration && calibration.open(null),
         onCalibrateCaptcha: () => calibration && calibration.open("captcha"),
+        onTestCaptchaSound: calibration && calibration.testCaptchaSound,
         onExportCal: calibration && calibration.exportProfile,
         onImportCal: calibration && calibration.importProfile,
         onCopyDiag: calibration && calibration.copyDiagnostics,

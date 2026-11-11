@@ -1,6 +1,6 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { createCaptchaAlert } from "../src/page/captcha-alert.js";
+import { createCaptchaAlert, defaultBeep } from "../src/page/captcha-alert.js";
 import { profileProblems } from "../src/infrastructure/calibration/index.js";
 
 describe("bot check alert", () => {
@@ -43,6 +43,23 @@ describe("bot check alert", () => {
   test("a provider without the part (not calibrated) does nothing", () => {
     const alert = createCaptchaAlert({ provider: {}, window: {}, beep: () => assert.fail("no beep") });
     assert.equal(alert.tick(), false);
+  });
+});
+
+describe("bot check sound", () => {
+  test("the test sound plays three tones through the audio context", () => {
+    const started = [];
+    class FakeAudio {
+      constructor() { this.state = "running"; this.currentTime = 0; this.destination = {}; }
+      createOscillator() { return { frequency: {}, connect() {}, start: (t) => started.push(t), stop() {} }; }
+      createGain() { return { gain: {}, connect() {} }; }
+    }
+    defaultBeep({ AudioContext: FakeAudio })();
+    assert.deepEqual(started, [0, 0.25, 0.5]);
+  });
+
+  test("no audio support is silent, not an error", () => {
+    assert.doesNotThrow(() => defaultBeep({})());
   });
 });
 

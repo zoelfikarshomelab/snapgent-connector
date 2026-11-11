@@ -50,6 +50,7 @@ export function openPreferences({ document, values, defaults, save, actions = {}
     ? `<section class="zs-menu-sec"><div class="zs-sec-label"><span>This site</span></div>` +
       row("zs-cal-start", "Calibrate this site", "teach it where the text box, send button and replies are") +
       row("zs-cal-captcha", "Calibrate bot check alert", "while the puzzle is on screen, click it: a sound then plays whenever it appears") +
+      row("zs-cal-captcha-sound", "Test bot check sound", "plays the alert sound now, no calibration or puzzle needed") +
       row("zs-cal-export", "Export calibration") + row("zs-cal-import", "Import calibration") +
       row("zs-cal-diag", "Copy diagnostics", "what it finds on this page, no text of the chat") +
       row("zs-cal-remove", "Remove calibration") + `</section>` +
@@ -164,6 +165,7 @@ export function openPreferences({ document, values, defaults, save, actions = {}
   const action = (id, fn) => { const el = pop.querySelector(`#${id}`); if (el && fn) el.addEventListener("click", () => { close(); fn(); }); };
   action("zs-cal-start", actions.onCalibrate);
   action("zs-cal-captcha", actions.onCalibrateCaptcha);
+  action("zs-cal-captcha-sound", actions.onTestCaptchaSound);
   action("zs-cal-export", actions.onExportCal);
   action("zs-cal-import", actions.onImportCal);
   action("zs-cal-diag", actions.onCopyDiag);
