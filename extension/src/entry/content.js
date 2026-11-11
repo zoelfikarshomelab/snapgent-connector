@@ -68,16 +68,17 @@ const terminal = createTerminal({ document, diag, onChange: redraw });
 terminal.start();
 const serverDirectory = new ServerDirectory({ store: storage, liveServers: () => state.bridge.servers || [], onChange: redraw, log: (...args) => console.warn("[snapgent]", ...args) });
 const visibility = createVisibility({ document, state, diag, onParkChange: redraw });
+// The preferences before the tools: the runner adds the folders left out of attachments to the model's own tree and search commands.
+const preferences = createPreferences({ storage, state, defaults: defaultPreferences(defaultCalibrations) });
 // The budget before the tools: the system prompt tells the model the effective Commands per reply, so the tools need its `calls` getter.
 const budget = createMessageBudget({ storage, hostname: location.hostname, provider, diag });
 // The SSH connect dialog and folder browser, made below with the bar's toast: the tools reach it only when a chat starts on a server.
 let ssh;
-const tools = createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner: notify, terminal, accountKey: accounts.id, calls: budget.calls, browseRemote: (server) => ssh.browse(server) });
+const tools = createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner: notify, terminal, accountKey: accounts.id, calls: budget.calls, excludedFolders: preferences.excludedFolders, browseRemote: (server) => ssh.browse(server) });
 terminal.setCancel((jobKey, name) => tools.runner.cancelJob(jobKey, name));
 terminal.setRunner((call, options) => tools.manual.run(call, options));
 terminal.setTools(() => tools.catalogue.active());
 const bridgeStatus = createBridgeStatus({ state, settings, tools, send, bar: () => bar, diag });
-const preferences = createPreferences({ storage, state, defaults: defaultPreferences(defaultCalibrations) });
 let stop;
 let session;
 let attachments;

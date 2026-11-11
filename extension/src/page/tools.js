@@ -15,10 +15,10 @@ import { createWorkspaceBinding } from "./workspace-binding.js";
 
 /**
  * @param {{ send: Function, provider: object, state: object, settings: object, serverDirectory: object, visibility: object,
- *           storage: object, diag: Function, banner: Function, terminal?: object, accountKey?: () => string, calls?: () => number }} deps  `banner(level, title, text)`
+ *           storage: object, diag: Function, banner: Function, terminal?: object, accountKey?: () => string, calls?: () => number, excludedFolders?: () => string[] }} deps  `banner(level, title, text)`
  *   shows the user a notice; `terminal` receives the live output of commands (see page/terminal.js); `calls` reads the effective Commands per reply (general preference, or this site's own)
  */
-export function createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner, terminal = null, accountKey = () => "", calls = null, browseRemote = async () => null }) {
+export function createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner, terminal = null, accountKey = () => "", calls = null, excludedFolders = () => [], browseRemote = async () => null }) {
   const bridge = {
     listTools: () => send({ type: "list_tools" }),
     callTool: (request) => send({ type: "call_tool", ...request }),
@@ -45,10 +45,10 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
   // A chat's folder is a path on one machine: the folder of this computer is never sent to an SSH server (and the other way round).
   const bindings = createWorkspaceBinding({ storage, provider, accountKey, serverKey: () => workspaceServerOf(settings.target()) || "" });
   const choice = createChoiceDialog();
-  const runner = new ToolRunner({ bridge, catalogue, session, visibility, sink, confirm, approvalMode: settings.approvalMode, workspaceRoot: bindings.current });
+  const runner = new ToolRunner({ bridge, catalogue, session, visibility, sink, confirm, approvalMode: settings.approvalMode, workspaceRoot: bindings.current, excludedFolders });
   // Commands the user types into the terminal run apart from the agent loop: a Stop that ended the loop leaves
   // `state.stop` set, and that must not cancel what the user runs by hand afterwards.
-  const manual = new ToolRunner({ bridge, catalogue, session: { ...session, isStopped: () => false }, visibility, sink, confirm, approvalMode: settings.approvalMode, workspaceRoot: bindings.current });
+  const manual = new ToolRunner({ bridge, catalogue, session: { ...session, isStopped: () => false }, visibility, sink, confirm, approvalMode: settings.approvalMode, workspaceRoot: bindings.current, excludedFolders });
   const skills = new SkillsService({
     store: storage,
     findTool: (bareName) => catalogue.active().find((tool) => bareToolName(tool.name) === bareName),

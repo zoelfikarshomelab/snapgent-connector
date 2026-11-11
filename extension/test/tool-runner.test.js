@@ -29,6 +29,40 @@ describe("ToolRunner: the folder the chat works in", () => {
   });
 });
 
+describe("ToolRunner: folders left out of attachments", () => {
+  function setupExcluded(folders) {
+    const timers = fakeTimers();
+    const bridge = fakeBridge({ tools: [tool("tree"), tool("find_files"), tool("search_files"), tool("read_file", { path: { type: "string" } })] });
+    const sess = fakeSession();
+    const catalogue = new ToolCatalogue({ bridge, session: sess, now: timers.now });
+    const runner = new ToolRunner({ bridge, catalogue, session: sess, visibility: fakeVisibility(), sink: fakeSink(), timers, excludedFolders: () => folders });
+    return { runner, bridge };
+  }
+  test("a tree the model asks for carries the list", async () => {
+    const { runner, bridge } = setupExcluded([".sqlx", "bruno"]);
+    await runner.run({ tool: "tree", arguments: {} });
+    assert.deepEqual(bridge.calls[0].arguments.exclude, [".sqlx", "bruno"]);
+  });
+  test("the model's own exclude is kept and joined, without repeats", async () => {
+    const { runner, bridge } = setupExcluded([".sqlx", "dist"]);
+    await runner.run({ tool: "search_files", arguments: { path: ".", query: "x", exclude: ["dist", "logs"] } });
+    assert.deepEqual(bridge.calls[0].arguments.exclude, ["dist", "logs", ".sqlx"]);
+  });
+  test("find_files for the file list (exclude_only) is left as it is", async () => {
+    const { runner, bridge } = setupExcluded([".sqlx"]);
+    await runner.run({ tool: "find_files", arguments: { path: ".", exclude: ["a"], exclude_only: true } });
+    assert.deepEqual(bridge.calls[0].arguments.exclude, ["a"]);
+  });
+  test("other commands and an empty list are not touched", async () => {
+    const one = setupExcluded([".sqlx"]);
+    await one.runner.run({ tool: "read_file", arguments: { path: "a" } });
+    assert.equal("exclude" in one.bridge.calls[0].arguments, false);
+    const none = setupExcluded([]);
+    await none.runner.run({ tool: "tree", arguments: {} });
+    assert.equal("exclude" in none.bridge.calls[0].arguments, false);
+  });
+});
+
 function setup({ tools = [tool("read_file", { path: { type: "string" } }), tool("git_status")], results, session, visibility } = {}) {
   const timers = fakeTimers();
   const bridge = fakeBridge({ tools, results });

@@ -25,6 +25,8 @@ const DEFAULT_TIMEOUT_MS = 120000;
 // The size parameters a tool may advertise (read_files, run_command / run_project_script / run_tests, get_command_output).
 const OUTPUT_LIMIT_ARGUMENTS = ["max_total_chars", "max_output_chars", "max_chars"];
 const STOPPED_BEFORE_RUN = "ERROR: the command was not run - stopped by the user.";
+// The commands that walk the folder and take `exclude`: the user's list of folders left out of attachments is added to what the model wrote.
+const EXCLUDING_COMMANDS = ["tree", "search_files", "find_files"];
 
 export class ToolRunner {
   /**
@@ -36,11 +38,12 @@ export class ToolRunner {
    *           confirm?: import("./ports.js").ConfirmPort,
    *           approvalMode?: () => string,
    *           workspaceRoot?: () => (string|null),   // the folder this chat works in, sent with every VS Code command
+   *           excludedFolders?: () => string[],      // the folders the user left out of attachments, added to tree / search_files / find_files
    *           timers?: import("./ports.js").Timers,
    *           timeoutMs?: number,
    *           now?: () => number }} deps
    */
-  constructor({ bridge, catalogue, session, visibility, sink, confirm = null, approvalMode = () => "manual", workspaceRoot = () => null, timers = globalThis, timeoutMs = DEFAULT_TIMEOUT_MS, now = Date.now }) {
+  constructor({ bridge, catalogue, session, visibility, sink, confirm = null, approvalMode = () => "manual", workspaceRoot = () => null, excludedFolders = () => [], timers = globalThis, timeoutMs = DEFAULT_TIMEOUT_MS, now = Date.now }) {
     this._bridge = bridge;
     this._catalogue = catalogue;
     this._session = session;
@@ -49,6 +52,7 @@ export class ToolRunner {
     this._confirm = confirm;
     this._approvalMode = approvalMode;
     this._workspaceRoot = workspaceRoot;
+    this._excludedFolders = excludedFolders;
     this._timers = timers;
     this._timeoutMs = timeoutMs;
     this._now = now;
@@ -82,7 +86,21 @@ export class ToolRunner {
     if (workspaceTarget && !this._catalogue.names().size) return FEEDBACK.workspaceClosed(this._workspaceRoot());
     if (!this._catalogue.knows(name)) return FEEDBACK.unknownTool(name, [...this._catalogue.names()]);
 
-    return this._execute(name, this._withBudget(name, withoutReserved(args), budgetChars), target, jobKey);
+    return this._execute(name, this._withBudget(name, this._withExcluded(name, withoutReserved(args)), budgetChars), target, jobKey);
+  }
+
+  /**
+   * The folders the user left out of attachments are left out of what the model lists and searches too: they are added to its own `exclude`.
+   * A find_files call with `exclude_only` is the file list of the `@` menu, which sends that list itself and wants nothing else added.
+   */
+  _withExcluded(name, args) {
+    if (!EXCLUDING_COMMANDS.includes(bareToolName(name)) || args.exclude_only === true) return args;
+    let own = [];
+    try { own = this._excludedFolders() || []; } catch { /* a broken preference must never stop a command */ }
+    const folders = Array.isArray(own) ? own.filter((item) => typeof item === "string" && item.trim()) : [];
+    if (!folders.length) return args;
+    const asked = Array.isArray(args.exclude) ? args.exclude.filter((item) => typeof item === "string") : [];
+    return { ...args, exclude: [...new Set([...asked, ...folders])] };
   }
 
   /**
