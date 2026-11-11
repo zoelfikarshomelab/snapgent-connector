@@ -1,7 +1,8 @@
 name: Release
 
-# Release = clean release only. The checks already ran in CI when the commit was pushed to main, so a tag does not repeat them;
-# it only refuses to build a commit whose CI run on main is not green.
+# Release = promote the good snapshot to a clean release. No rebuild.
+# Snapshot already built and verified the commit, so Release just re-uses
+# those exact files. What you tested is what you ship.
 #
 #   v3.9.43   a release (clean version, no suffix).
 #
@@ -9,7 +10,12 @@ name: Release
 #   Actions -> Snapshot -> Run workflow -> branch main
 #   publishes v3.9.43-<short hash> as a pre-release. Many snapshots can share
 #   the same version, each one is just a different commit. No version lock.
-# When one snapshot is good, tag v<version> to make the real release here.
+#   Version inside the files is always 3.9.43 (no hash) - the hash is only
+#   in the Snapshot release tag name.
+# When one snapshot is good, tag v<version> on that SAME commit to promote
+# it here. If there is no snapshot for the tagged commit, Release fails
+# and tells you to run Snapshot first. It never falls back to an older
+# snapshot, because the code would be different.
 #
 # The tag version must match the version in the code. A tag with a suffix
 # (e.g. v3.9.43-abc1234) is refused - run Snapshot instead.
@@ -26,6 +32,7 @@ jobs:
     outputs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
+      snapshot_tag: ${{ steps.version.outputs.snapshot_tag }}
     steps:
       - uses: actions/checkout@v4
       - id: version
@@ -42,123 +49,45 @@ jobs:
           fi
           echo "version=$name" >> "$GITHUB_OUTPUT"
           echo "tag=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+          echo "snapshot_tag=v$name-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+          echo "Will promote snapshot v$name-${GITHUB_SHA::7} to $GITHUB_REF_NAME if it exists."
 
-  verify-ci:
-    name: CI is green on this commit
+  verify-snapshot:
+    name: Snapshot exists for this commit
+    needs: [check-version]
     runs-on: ubuntu-latest
-    permissions:
-      actions: read
-      contents: read
     steps:
-      # The tag is often pushed right after main, so the CI run may still be going: wait for it (up to 30 minutes).
       - env:
           GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
         run: |
-          for _ in $(seq 1 60); do
-            run="$(gh run list --workflow ci.yml --branch main --event push --commit "$GITHUB_SHA" --limit 1 \
-              --json status,conclusion,url --jq '.[] | "\(.status) \(.conclusion) \(.url)"')"
-            if [ -z "$run" ]; then
-              echo "No CI run on main for ${GITHUB_SHA::7} yet."
-            else
-              read -r status conclusion url <<< "$run"
-              echo "CI run: $status ($conclusion) $url"
-              if [ "$status" = "completed" ]; then
-                if [ "$conclusion" = "success" ]; then exit 0; fi
-                echo "CI is not green on this commit ($conclusion): not releasing." >&2
-                exit 1
-              fi
-            fi
-            sleep 30
-          done
-          echo "No finished CI run on main for ${GITHUB_SHA::7}: push the commit to main and wait for CI before releasing." >&2
-          exit 1
+          snapshot="${{ needs.check-version.outputs.snapshot_tag }}"
+          if ! gh release view "$snapshot" --json tagName --jq '.tagName'; then
+            echo "No snapshot release $snapshot for this commit. Run Actions -> Snapshot -> Run workflow on branch main first, then tag." >&2
+            exit 1
+          fi
+          echo "Found snapshot $snapshot - will promote its exact files." 
 
-  extension:
-    needs: [check-version, verify-ci]
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: extension
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: extension/package-lock.json
-      - run: npm ci
-      - run: npm run build
-      - uses: actions/upload-artifact@v4
-        with:
-          name: extension-dist
-          path: extension/dist
-          if-no-files-found: error
 
-  windows-binaries:
-    needs: [check-version, verify-ci]
-    runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: python -m pip install pyinstaller websockets
-      - run: pyinstaller --noconfirm snapgent.spec
-        working-directory: server
-      - uses: actions/upload-artifact@v4
-        with:
-          name: windows-binary
-          path: server/dist/snapgent.exe
-          if-no-files-found: error
 
-  linux-binary:
-    needs: [check-version, verify-ci]
-    runs-on: ubuntu-22.04   # built on an older glibc so the program runs on older distributions too
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-      - run: python -m pip install pyinstaller websockets
-      - run: pyinstaller --noconfirm snapgent.spec
-        working-directory: server
-      - uses: actions/upload-artifact@v4
-        with:
-          name: linux-binary
-          path: server/dist/snapgent
-          if-no-files-found: error
 
   publish:
-    needs: [check-version, extension, windows-binaries, linux-binary]
+    needs: [check-version, verify-snapshot]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/download-artifact@v4
-        with:
-          name: extension-dist
-          path: extension-dist
-      - uses: actions/download-artifact@v4
-        with:
-          name: windows-binary
-          path: windows-binary
-      - uses: actions/download-artifact@v4
-        with:
-          name: linux-binary
-          path: linux-binary
-      - name: Assemble the release
-        run: >
-          python3 scripts/package_release.py
-          --version "${{ needs.check-version.outputs.version }}"
-          --extension-dist extension-dist
-          --windows-binary windows-binary/snapgent.exe
-          --linux-binary linux-binary/snapgent
-          --out out
-      - name: Publish
+      - name: Download the snapshot files
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          snapshot="${{ needs.check-version.outputs.snapshot_tag }}"
+          mkdir -p snapshot-files
+          gh release download "$snapshot" --dir snapshot-files
+          ls -lh snapshot-files
+      - name: Publish clean release from snapshot files
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           v="${{ needs.check-version.outputs.version }}"
           tag="${{ needs.check-version.outputs.tag }}"
-          gh release create "$tag" "out/snapgent.exe" "out/snapgent-extension-v$v.zip" "out/snapgent-linux-x64-v$v.tar.gz" \
+          gh release create "$tag" "snapshot-files/snapgent.exe" "snapshot-files/snapgent-extension-v$v.zip" "snapshot-files/snapgent-linux-x64-v$v.tar.gz" \
             --title "snapgent $tag" --notes-file CHANGELOG.md --verify-tag
