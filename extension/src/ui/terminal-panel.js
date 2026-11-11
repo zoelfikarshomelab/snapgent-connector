@@ -63,7 +63,7 @@ export function createTerminalPanel({ document, onStop = () => {}, onCopy = () =
   /** The selected command in full, with when it started and ended: the tab itself is too narrow for either. */
   function timesText(tab) {
     if (!tab.started) return "";
-    return tab.status === "running" ? `Started ${tab.started} · running` : `Started ${tab.started} · ended ${tab.ended} · took ${tab.took}`;
+    return tab.status === "running" ? `Started ${tab.started} · running${tab.log ? ` · log ${tab.log}` : ""}` : `Started ${tab.started} · ended ${tab.ended} · took ${tab.took}`;
   }
 
   function showMeta(key) {

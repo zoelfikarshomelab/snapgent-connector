@@ -138,12 +138,21 @@ class LogTests(BackgroundCase):
             return created[-1]
 
         def on_chunk(stream, text):
-            seen.append(created[0].read_text(encoding="utf-8"))
+            if stream != "log":
+                seen.append(created[0].read_text(encoding="utf-8"))
 
         with mock.patch.object(background.RUNS, "create_log", side_effect=spy):
             process.run_process_streaming([sys.executable, "-u", "-c", "print('early')"], Path.cwd(), detach=True, on_chunk=on_chunk)
         self.assertIn("early", seen[0])
         self.assertFalse(created[0].exists(), "a command that ended inside the window leaves no log behind")
+
+    def test_the_log_path_is_announced_once_on_its_own_stream_when_the_command_starts(self):
+        announced = []
+        process.run_process_streaming([sys.executable, "-u", "-c", "print('x')"], Path.cwd(), detach=True,
+                                      on_chunk=lambda stream, text: announced.append((stream, text)))
+        paths = [text for stream, text in announced if stream == "log"]
+        self.assertEqual(len(paths), 1)
+        self.assertTrue(paths[0].endswith(".log"))
 
     def test_text_without_a_newline_reaches_the_log_and_the_answer_while_the_command_runs(self):
         source = "import sys, time\nsys.stdout.write('partial, no newline')\nsys.stdout.flush()\ntime.sleep(5)"

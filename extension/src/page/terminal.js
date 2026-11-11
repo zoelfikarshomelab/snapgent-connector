@@ -66,6 +66,7 @@ export function createTerminal({ document, diag, onChange = () => {}, copy = (te
       key: tab.key, name: labelOf(tab), status: tab.status, command: tab.label || tab.name,
       started: formatClock(tab.startedAt), ended: tab.endedAt === null ? "" : formatClock(tab.endedAt),
       took: tab.endedAt === null ? "" : formatDuration(tab.endedAt - tab.startedAt),
+      log: tab.status === "running" ? tab.logPath || "" : "", // the file only matters while it can be followed
     })));
     return ordered;
   }
@@ -99,6 +100,7 @@ export function createTerminal({ document, diag, onChange = () => {}, copy = (te
   function ingest(message) {
     const tab = tabs.get(message && message.jobKey);
     if (!tab || tab.status !== "running" || typeof message.text !== "string" || !message.text) return;
+    if (message.stream === "log") { tab.logPath = message.text; draw(); return; } // where the server writes this command's output: shown, not part of it
     const parsed = feed(tab.state, message.text);
     for (const segments of parsed.lines) {
       panel.appendLine(tab.key, segments);

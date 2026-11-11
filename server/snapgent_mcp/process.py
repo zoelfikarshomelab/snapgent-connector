@@ -272,6 +272,11 @@ def run_process_streaming(command: List[str], cwd: Path, timeout: int = COMMAND_
             state.log = lambda text, path=state.log_path: append_log(path, text)
         except OSError:
             state.log_path = None
+        if state.log_path is not None and on_chunk is not None:
+            try:
+                on_chunk("log", str(state.log_path))  # tells the terminal panel where to `tail -f`; not output, so it is not counted in the live budget
+            except Exception:
+                pass
     events: "queue.Queue[_EVENT]" = queue.Queue()
     stop = threading.Event()
     readers = [threading.Thread(target=_drain_pipe, args=(process.stdout, "stdout", events, stop), daemon=True),

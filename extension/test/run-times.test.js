@@ -35,4 +35,16 @@ describe("the terminal shows what ran and when", () => {
     const tip = window.document.querySelector(".zs-t-tab").title;
     assert.ok(tip.includes(long) && tip.includes("14:03:22"), "the tooltip has what the badge cuts off");
   });
+
+  test("the log file of a running command is shown beside the times and is not part of its output", () => {
+    const { window } = new JSDOM("<!doctype html><body></body>");
+    const t = createTerminal({ document: window.document, diag: () => {}, now: () => 0 });
+    t.start();
+    t.begin({ key: "k2", name: "run_command", label: "docker build ." });
+    t.ingest({ jobKey: "k2", seq: 1, stream: "log", text: "/tmp/snapgent-r7-abc.log" });
+    assert.match(window.document.querySelector(".zs-t-times").textContent, /running · log \/tmp\/snapgent-r7-abc\.log/);
+    assert.equal(window.document.querySelectorAll(".zs-t-term > *").length, 0, "the path is not drawn as output");
+    t.finish("k2", "success");
+    assert.doesNotMatch(window.document.querySelector(".zs-t-times").textContent, /log \/tmp/);
+  });
 });
