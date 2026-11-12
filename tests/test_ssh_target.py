@@ -68,6 +68,16 @@ class CommandLineTests(unittest.TestCase):
             self.assertIn(wanted, args)
         self.assertEqual(args[-1], 'echo hi')
 
+    def test_a_machine_without_shared_connections_runs_one_ssh_per_command(self):
+        args = t.direct_args(self.target, 'echo hi')
+        self.assertEqual(args[-1], 'echo hi')
+        self.assertIn('BatchMode=yes', args)
+        self.assertNotIn('-M', args)
+        self.assertFalse([a for a in args if 'ControlPath=' in a], 'nothing is shared')
+        asking = t.direct_args(self.target, 'true', batch=False)
+        self.assertNotIn('BatchMode=yes', asking)
+        self.assertIn('NumberOfPasswordPrompts=2', asking)
+
     def test_control_operations(self):
         args = t.control_args(self.target, '/tmp/x/m', 'exit')
         self.assertEqual(args[args.index('-O') + 1], 'exit')

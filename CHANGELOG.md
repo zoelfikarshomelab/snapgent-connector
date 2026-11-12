@@ -4,6 +4,9 @@ All notable changes to snapgentV3 Free are documented here.
 
 ## [Unreleased]
 
+### Added
+- **SSH connections work on Windows.** The bridge used to refuse SSH there, because it held the login open with OpenSSH's shared connections (`ControlMaster`), which Windows does not have. Windows now gets one `ssh` per command instead (`ssh_direct.py`, chosen by `ssh_session.new_session`): the first connection signs in and may ask (a host seen for the first time, a key with a passphrase) through the same popup in the extension, and every command after it runs in `BatchMode` so it can never sit waiting for a person. Linux and macOS keep the shared connection unchanged. The price on Windows is a new connection per command; the gain is that SSH works where a shared connection cannot exist. Two supporting changes: the askpass helper reaches the bridge over a loopback port (with the same random token) because asyncio has no unix sockets on Windows, and `snapgent.exe` recognises itself as the helper from that token, since ssh passes the question where a `--askpass` flag would go. `version_problem` also accepts `OpenSSH_for_Windows_*`. Note for Windows: SSH over there needs a key, not a password typed per command, and the ssh program must be the one Windows ships (Settings > Optional features > OpenSSH Client).
+
 ## [V3.9.43] - 2026-11-11
 
 ### Security

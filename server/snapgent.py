@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from snapgent_bridge import launcher, settings
+from snapgent_bridge.askpass_helper import TOKEN_VARIABLE as _ASKPASS_TOKEN
 from snapgent_bridge.launcher import LEGACY_MCP_FLAGS, MCP_FLAG
 
 
@@ -43,12 +44,26 @@ def _owns_its_console() -> bool:
         return False
 
 
+def _is_askpass_invocation(argv) -> bool:
+    """Was this program started by ssh to ask a question?
+
+    ssh runs SSH_ASKPASS with the question as its only argument, so on Windows there is no room for `--askpass`. The token
+    the bridge puts in ssh's environment is what tells this program it is the helper; a flag is still accepted as before."""
+    if not os.environ.get(_ASKPASS_TOKEN):
+        return False
+    first = argv[0] if argv else ""
+    return first not in (MCP_FLAG, *LEGACY_MCP_FLAGS, "--askpass", "--version", "-V")
+
+
 def main(argv=None) -> int:
     argv = sys.argv[1:] if argv is None else argv
     if argv[:1] == ["--askpass"]:
         # What ssh runs when it needs a passphrase: the bridge answers it through the browser (snapgent_bridge/askpass.py).
         from snapgent_bridge.askpass_helper import main as askpass_main
         return askpass_main(argv[1:])
+    if _is_askpass_invocation(argv):
+        from snapgent_bridge.askpass_helper import main as askpass_main
+        return askpass_main(argv)
     if argv[:1] and argv[0] in (MCP_FLAG, *LEGACY_MCP_FLAGS):
         from snapgent_mcp.server import main as mcp_main
         mcp_main()

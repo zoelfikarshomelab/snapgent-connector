@@ -1,6 +1,8 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 """One SSH connection to one server, held open by the bridge for as long as the user works there.
 
+This is the POSIX half; Windows has no shared connections and uses ssh_direct.DirectSshSession instead (new_session picks).
+
 It is a shared connection (OpenSSH's ControlMaster): the user signs in ONCE, through the popup in the browser, and everything that
 follows rides on that login without asking again: looking at the server, putting the Snapgent MCP server there, and the MCP
 session itself. Nothing about the login is kept: no password, no passphrase, no file. When the connection ends the user signs in
@@ -34,7 +36,8 @@ class SshError(RuntimeError):
 
 
 def version_problem(text: str) -> Optional[str]:
-    match = re.search(r"OpenSSH_([0-9]+)\.([0-9]+)", text or "")
+    # Win32-OpenSSH calls itself `OpenSSH_for_Windows_9.5p1`: the version sits in the same place either way.
+    match = re.search(r"OpenSSH(?:_for_Windows)?_([0-9]+)\.([0-9]+)", text or "")
     if match is None:
         return "Only OpenSSH is supported, and the installed ssh did not say it is OpenSSH."
     version = (int(match.group(1)), int(match.group(2)))
@@ -43,10 +46,12 @@ def version_problem(text: str) -> Optional[str]:
     return None
 
 
-def platform_problem() -> Optional[str]:
-    if os.name == "nt":
-        return "SSH connections are not available on Windows yet: they need OpenSSH's shared connections, which Windows does not have."
-    if shutil.which("ssh") is None:
+def platform_problem(which: Callable[[str], Optional[str]] = shutil.which) -> Optional[str]:
+    """Why this machine cannot use SSH at all, or None.
+
+    Windows has no shared connections, so it gets one ssh per command instead (DirectSshSession). Either way the ssh
+    program itself has to be there."""
+    if which("ssh") is None:
         return "ssh was not found. Install the OpenSSH client."
     return None
 
@@ -62,10 +67,10 @@ async def ssh_problem(ssh: str = "ssh", spawn: Callable[..., Any] = asyncio.crea
 
 
 class SshSession:
-    def __init__(self, target: ssh_target.SshTarget, *, ssh: str = "ssh", log: Callable[[str], None] = lambda _message: None,
+    def __init__(self, target: ssh_target.SshTarget, *, ssh: Any = "ssh", log: Callable[[str], None] = lambda _message: None,
                  spawn: Callable[..., Any] = asyncio.create_subprocess_exec) -> None:
         self.target = target
-        self._ssh = ssh
+        self._ssh = [ssh] if isinstance(ssh, str) else list(ssh)  # a list is for tests: `python fake-ssh.py`
         self._log = log
         self._spawn = spawn
         self._dir: Optional[Path] = None
@@ -101,7 +106,7 @@ class SshSession:
             self._env.update(extra)
             try:
                 self._master = await self._spawn(
-                    self._ssh, *ssh_target.master_args(self.target, self.control_path), env=self._env,
+                    *self._ssh, *ssh_target.master_args(self.target, self.control_path), env=self._env,
                     stdin=asyncio.subprocess.DEVNULL, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE,
                     start_new_session=True,  # no controlling terminal to fall back on
                 )
@@ -149,7 +154,7 @@ class SshSession:
 
     async def _run_ssh(self, args: List[str], stdin: Optional[bytes], timeout: float) -> Tuple[int, bytes, bytes]:
         process = await self._spawn(
-            self._ssh, *args, env=self._env,
+            *self._ssh, *args, env=self._env,
             stdin=asyncio.subprocess.PIPE if stdin is not None else asyncio.subprocess.DEVNULL,
             stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE,
         )
@@ -176,7 +181,8 @@ class SshSession:
 
     def server_config(self, remote_command: str) -> Dict[str, Any]:
         """The MCP server entry that runs `remote_command` on the server (stdio over the shared connection)."""
-        return {"command": self._ssh, "args": ssh_target.client_args(self.target, self.control_path, remote_command), "env": {}}
+        return {"command": self._ssh[0],
+                "args": [*self._ssh[1:], *ssh_target.client_args(self.target, self.control_path, remote_command)], "env": {}}
 
     # ── closing ────────────────────────────────────────────────────────────
 

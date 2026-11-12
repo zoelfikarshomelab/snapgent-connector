@@ -100,3 +100,12 @@ def client_args(target: SshTarget, control_path: str, remote_command: str) -> Li
     """A command on the server through the master: never asks anything (BatchMode) and has no terminal (-T), so the bytes of an MCP session arrive as they were written."""
     return ["-T", "-o", f"ControlPath={control_path}", "-o", "ControlMaster=no", "-o", "BatchMode=yes", *_COMMON,
             *_destination(target), remote_command]
+
+
+def direct_args(target: SshTarget, remote_command: str, *, batch: bool = True) -> List[str]:
+    """One ssh that signs in, runs a command and ends: what a platform without shared connections has (Windows).
+
+    The first connection may ask (a host seen for the first time, a key with a passphrase); every one after it runs in
+    BatchMode, so a command can never sit waiting for a person who is not there."""
+    asking = ["-o", "BatchMode=yes"] if batch else ["-o", "NumberOfPasswordPrompts=2"]
+    return ["-T", *_COMMON, "-o", "ConnectTimeout=20", *asking, *_destination(target), remote_command]

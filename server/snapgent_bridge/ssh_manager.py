@@ -13,7 +13,8 @@ from .askpass import CONFIRM, MAX_ANSWER_CHARS, Prompt
 from .registry import ServerRegistry
 from .ssh_bundle import Bundle, build_bundle
 from .ssh_remote import RemoteError, prepare_remote, serve_command
-from .ssh_session import SshError, SshSession, platform_problem, ssh_problem
+from .ssh_direct import new_session
+from .ssh_session import SshError, platform_problem, ssh_problem
 from .ssh_target import SshTarget, TargetError, parse_target, server_id
 
 PROMPT_SECONDS = 120.0  # how long the popup waits for the person
@@ -23,7 +24,7 @@ Broadcast = Callable[[Dict[str, Any]], Awaitable[None]]
 
 class SshManager:
     def __init__(self, registry: ServerRegistry, broadcast: Broadcast, announce: Callable[[], Awaitable[None]],
-                 log: Callable[[str], None], *, session_factory: Callable[..., Any] = SshSession,
+                 log: Callable[[str], None], *, session_factory: Callable[..., Any] = new_session,
                  make_bundle: Callable[[], Bundle] = build_bundle,
                  check: Callable[[], Awaitable[Optional[str]]] = ssh_problem,
                  platform_check: Callable[[], Optional[str]] = platform_problem) -> None:

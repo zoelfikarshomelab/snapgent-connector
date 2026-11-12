@@ -155,6 +155,7 @@ class VersionTests(unittest.TestCase):
     def test_only_a_new_enough_openssh_is_accepted(self):
         self.assertIsNone(ssh_session.version_problem('OpenSSH_9.6p1 Ubuntu-3ubuntu13, OpenSSL 3.0.13'))
         self.assertIsNone(ssh_session.version_problem('OpenSSH_8.4p1, OpenSSL 1.1.1'))
+        self.assertIsNone(ssh_session.version_problem('OpenSSH_for_Windows_9.5p1, LibreSSL 3.8.2'))
         self.assertIn('too old', ssh_session.version_problem('OpenSSH_8.3p1, OpenSSL 1.1.1'))
         self.assertIn('too old', ssh_session.version_problem('OpenSSH_7.9p1'))
         self.assertIn('Only OpenSSH', ssh_session.version_problem('Dropbear v2022.83'))

@@ -7,6 +7,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from snapgent_bridge import askpass_helper
 from snapgent_bridge.askpass import CONFIRM, INFO, MAX_ANSWER_CHARS, MAX_PROMPT_CHARS, SECRET, AskpassBroker, Prompt, classify_prompt
@@ -19,6 +20,25 @@ class ClassifyTests(unittest.TestCase):
         self.assertEqual(classify_prompt('Are you sure you want to continue connecting (yes/no/[fingerprint])?', ''), CONFIRM)
         self.assertEqual(classify_prompt('Continue?', 'confirm'), CONFIRM)
         self.assertEqual(classify_prompt('Some notice', 'none'), INFO)
+
+
+class EntryPointTests(unittest.TestCase):
+    def test_the_program_knows_it_is_the_helper_from_the_token_ssh_was_given(self):
+        import snapgent
+        import snapgent_bridge.askpass_helper as helper
+        seen = []
+        real = helper.main
+        helper.main = lambda argv: (seen.append(list(argv)), 0)[1]
+        try:
+            with mock.patch.dict(os.environ, {helper.TOKEN_VARIABLE: 't'}):
+                self.assertEqual(snapgent.main(["me@host's password:"]), 0)
+            with mock.patch.dict(os.environ, {}, clear=False):
+                os.environ.pop(helper.TOKEN_VARIABLE, None)
+                self.assertFalse(snapgent._is_askpass_invocation(['--mcp']))
+                self.assertFalse(snapgent._is_askpass_invocation(['prompt']))
+        finally:
+            helper.main = real
+        self.assertEqual(seen, [["me@host's password:"]])
 
 
 class HelperTests(unittest.TestCase):
