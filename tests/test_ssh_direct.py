@@ -22,7 +22,9 @@ if "-V" in args:
 if os.environ.get("FAKE_FAIL"):
     sys.stderr.write(os.environ["FAKE_FAIL"] + chr(10))
     sys.exit(255)
-print("ran:" + args[-1])
+# Bytes, not print(): text mode would end the line with CR LF on Windows and the test would say nothing about ssh.
+sys.stdout.buffer.write(b"ran:" + args[-1].encode() + bytes([10]))
+sys.stdout.buffer.flush()
 '''
 
 TARGET = SshTarget('me', 'host')

@@ -9,6 +9,7 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+from snapgent_bridge import askpass
 from snapgent_bridge import askpass_helper
 from snapgent_bridge.askpass import CONFIRM, INFO, MAX_ANSWER_CHARS, MAX_PROMPT_CHARS, SECRET, AskpassBroker, Prompt, classify_prompt
 
@@ -110,6 +111,53 @@ class BrokerTests(unittest.IsolatedAsyncioTestCase):
         answer = await self.direct(self.env[askpass_helper.TOKEN_VARIABLE], 'q' * (MAX_PROMPT_CHARS + 500))
         self.assertEqual(len(answer), MAX_ANSWER_CHARS)
         self.assertEqual(len(self.asked[0].text), MAX_PROMPT_CHARS)
+
+
+class TcpBrokerTests(unittest.IsolatedAsyncioTestCase):
+    """The Windows shape of the broker: a loopback port instead of a unix socket.
+
+    `_IS_WINDOWS` is patched, so the path Windows takes is covered by the suite on every platform."""
+
+    async def asyncSetUp(self):
+        self.dir = Path(tempfile.mkdtemp(prefix='sg-'))
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        self.asked = []
+
+        async def ask(prompt):
+            self.asked.append(prompt)
+            return 'hunter2'
+
+        self.broker = askpass.AskpassBroker(ask, lambda _message: None)
+        self.addAsyncCleanup(self.broker.stop)
+        with mock.patch.object(askpass, '_IS_WINDOWS', True):
+            self.env = await self.broker.start(self.dir, [sys.executable])
+
+    async def through_the_helper(self, token):
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(
+            None, askpass_helper.ask, None, token, 'me@host password:', '', self.env[askpass_helper.PORT_VARIABLE])
+
+    async def test_the_bridge_listens_on_a_loopback_port_and_the_answer_comes_back(self):
+        self.assertIn(askpass_helper.PORT_VARIABLE, self.env)
+        self.assertNotIn(askpass_helper.SOCKET_VARIABLE, self.env, 'there is no unix socket to use')
+        self.assertEqual(self.env['SSH_ASKPASS'], sys.executable, 'one program: it recognises itself from the token')
+        self.assertEqual(await self.through_the_helper(self.env[askpass_helper.TOKEN_VARIABLE]), 'hunter2')
+        self.assertEqual([p.text for p in self.asked], ['me@host password:'])
+
+    async def test_a_caller_without_the_token_gets_nothing(self):
+        self.assertIsNone(await self.through_the_helper('wrong-token'))
+        self.assertEqual(self.asked, [])
+
+    async def test_a_helper_that_needs_two_words_gets_a_cmd_file_that_goes_away_with_the_broker(self):
+        broker = askpass.AskpassBroker(lambda _p: None, lambda _m: None)
+        self.addAsyncCleanup(broker.stop)
+        with mock.patch.object(askpass, '_IS_WINDOWS', True):
+            env = await broker.start(self.dir, [sys.executable, 'snapgent.py'])
+        helper = Path(env['SSH_ASKPASS'])
+        self.assertEqual(helper.suffix, '.cmd')
+        self.assertIn('--askpass', helper.read_text(encoding='utf-8'))
+        await broker.stop()
+        self.assertFalse(helper.parent.exists(), 'the folder holding the .cmd is removed with the broker')
 
 
 if __name__ == '__main__':
