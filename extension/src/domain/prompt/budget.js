@@ -64,7 +64,7 @@ export function composeBatch(results, notRun = []) {
   let text = results.join("\n\n");
   if (notRun.length) {
     const reasons = [...new Set(notRun.map((item) => item.why))].join("; ");
-    text += `${text ? "\n\n" : ""}NOT RUN (${reasons}): ${notRun.map((item) => item.tool || "?").join(", ")}. Send them again, one reply at a time, if they are still needed.`;
+    text += `${text ? "\n\n" : ""}These commands did not run (${reasons}): ${notRun.map((item) => item.tool || "?").join(", ")}. Send them again, one reply at a time, if they are still needed.`;
   }
   return text;
 }

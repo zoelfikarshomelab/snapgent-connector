@@ -1,6 +1,7 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { SessionTracker, textShowsSession } from "../src/application/session-tracker.js";
+import { shapeOf } from "../src/domain/tools/result-marker.js";
 
 const MARK = "is your current workspace";
 
@@ -14,12 +15,18 @@ async function tracker(saved) {
 const facts = (over = {}) => ({ starting: false, startingKey: null, running: false, loopKey: null, injecting: false, started: false, key: "/c/1", chatEmpty: false, markerInDom: () => false, ...over });
 
 describe("textShowsSession", () => {
-  test("the marker, an injected result and a system note are session signals", () => {
+  test("the marker, an injected result and a note are session signals", () => {
     assert.equal(textShowsSession(`proj ${MARK}. hello`, MARK), true);
     assert.equal(textShowsSession("⟦ZS-SYS⟧ hello", MARK), true, "the tag older versions started with");
     assert.equal(textShowsSession("intro\n» read_file\nbody", MARK), true);
     assert.equal(textShowsSession("intro\nOutput of 'read_file':\nbody", MARK), true, "the older wording");
-    assert.equal(textShowsSession("(System note: the reply was cut off.)", MARK), true);
+    assert.equal(textShowsSession("intro\nI ran `read_file` for you.\nbody", MARK), true, "the wording of the default template");
+    assert.equal(textShowsSession("(A note from me: the reply was cut off.)", MARK), true);
+  });
+  test("a message the page sent itself is a signal, whatever its wording", () => {
+    const sent = "Voici ce que j'ai obtenu:\n\na.js";
+    assert.equal(textShowsSession(sent, MARK, [shapeOf(sent)]), true);
+    assert.equal(textShowsSession(sent, MARK, []), false, "without the page's memory it is only the wording that counts");
   });
   test("a model merely showing the command format is not one", () => {
     assert.equal(textShowsSession('Use {"command":"read_file","arguments":{}} like this', MARK), false);

@@ -23,7 +23,7 @@ export const needsApproval = (result) =>
   !!(result && result.kind === "confirmation_required" && result.confirmation && result.confirmation.token);
 
 export const declinedFeedback = (description) =>
-  `ERROR: the user declined to approve this action: ${description}. It was NOT run. Do NOT retry it or look for a way around it; tell the user what you wanted to do and ask how to proceed.`;
+  `you asked for something risky and the user declined it: ${description}. It was NOT run. Do NOT retry it or look for a way around it; tell the user what you wanted to do and ask how to proceed.`;
 
 export const unavailableFeedback = (description) =>
-  `ERROR: this action needs the user's approval, but this page cannot ask for it: ${description}. It was NOT run.`;
+  `this action needs the user's approval, but this page cannot ask for it: ${description}. It was NOT run.`;

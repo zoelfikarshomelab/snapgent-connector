@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { JSDOM } from "jsdom";
 import { DEFAULT_CONTEXT_FILES, clampContextFiles } from "../src/domain/prompt/context-file.js";
 import { DEFAULT_EXCLUDED_FOLDERS, clampExcludedFolders, parseFolderNames } from "../src/domain/prompt/excluded-folders.js";
+import { DEFAULT_TEMPLATES, TEMPLATE_NAMES } from "../src/domain/prompt/templates.js";
 import { createPreferences, KEYS } from "../src/page/preferences.js";
 import { openPreferences } from "../src/ui/preferences-popup.js";
 
@@ -83,7 +84,20 @@ describe("preferences", () => {
 
   test("read() gives what the panel shows", async () => {
     const preferences = createPreferences({ storage: fakeStorage({ [KEYS.chars]: 150000, [KEYS.calls]: 12 }), state: {} });
-    assert.deepEqual(await preferences.read(), { chars: 150000, calls: 12, asFile: false, folders: DEFAULT_EXCLUDED_FOLDERS, contextFiles: DEFAULT_CONTEXT_FILES, startContext: true, startTree: true });
+    const read = await preferences.read();
+    assert.deepEqual({ ...read, templates: undefined }, { chars: 150000, calls: 12, asFile: false, folders: DEFAULT_EXCLUDED_FOLDERS, contextFiles: DEFAULT_CONTEXT_FILES, startContext: true, startTree: true, templates: undefined });
+    assert.deepEqual(read.templates, DEFAULT_TEMPLATES, "the wording of the messages starts at the defaults");
+  });
+
+  test("the templates are saved as the user writes them, and read back", async () => {
+    const storage = fakeStorage();
+    const preferences = createPreferences({ storage, state: {} });
+    await flush();
+    assert.deepEqual(preferences.templates(), DEFAULT_TEMPLATES);
+    preferences.setTemplates({ ...DEFAULT_TEMPLATES, result: "mine" });
+    assert.equal(storage.data[KEYS.templates].result, "mine");
+    assert.equal(preferences.templates().result, "mine");
+    assert.equal(preferences.templates().reminder, DEFAULT_TEMPLATES.reminder, "the ones the user did not touch stay as they were");
   });
 
   test("output as file: off until switched on, saved as true or false, and read back", async () => {
@@ -212,9 +226,44 @@ describe("preferences panel", () => {
       document: w.document, values: { chars: 100000, calls: 8, folders: [] }, defaults: { folders: [] },
       save: { chars() {}, calls() {}, folders() {} }, actions: { onFillReminder: () => called.push("reminder") },
     });
-    assert.match(w.document.querySelector(".zs-pref-card").textContent, /Test the reminder message/);
+    assert.match(w.document.querySelector(".zs-pref-card").textContent, /the real reminder/);
     w.document.querySelector("#zs-pref-reminder-fill").click();
     assert.deepEqual(called, ["reminder"]);
+  });
+
+  test("every template has a field, and its button writes an example through its action", () => {
+    const w = new JSDOM("<!doctype html><body></body>").window;
+    const called = [];
+    openPreferences({
+      document: w.document, values: { chars: 100000, calls: 8, folders: [], templates: DEFAULT_TEMPLATES }, defaults: { folders: [] },
+      save: { chars() {}, calls() {}, folders() {} }, actions: { onFillTemplate: (name) => called.push(name) },
+    });
+    const $ = (selector) => w.document.querySelector(selector);
+    const buttons = TEMPLATE_NAMES.map((name) => {
+      assert.ok($(`#zs-pref-tpl-${name}`), `the field of ${name}`);
+      assert.equal($(`#zs-pref-tpl-${name}`).value, DEFAULT_TEMPLATES[name]);
+      return $(`#zs-pref-tpl-${name}-fill`);
+    });
+    // The first click closes the popup, so the buttons are taken before it.
+    for (const button of buttons) button.click();
+    assert.deepEqual(called, TEMPLATE_NAMES);
+  });
+
+  test("a template the user writes is saved as it is, and the defaults come back with the reset", () => {
+    const w = new JSDOM("<!doctype html><body></body>").window;
+    const saved = [];
+    openPreferences({
+      document: w.document, values: { chars: 100000, calls: 8, folders: [], templates: DEFAULT_TEMPLATES }, defaults: { folders: [] },
+      save: { chars() {}, calls() {}, folders() {}, templates: (all) => saved.push(all) },
+    });
+    const $ = (selector) => w.document.querySelector(selector);
+    const box = $("#zs-pref-tpl-result");
+    box.value = "mine";
+    box.dispatchEvent(new w.Event("change", { bubbles: true }));
+    assert.equal(saved[0].result, "mine");
+    $("#zs-pref-reset").click();
+    assert.equal($("#zs-pref-tpl-result").value, DEFAULT_TEMPLATES.result);
+    assert.equal(saved[saved.length - 1].result, DEFAULT_TEMPLATES.result);
   });
 
   test("calibration actions are offered and wired, and there is no section for the bar", () => {
@@ -240,7 +289,7 @@ describe("the attachable files follow the preference", () => {
   test("the list is asked for with the user's own excluded folders instead of the built-in ones", async () => {
     const { createAttachments } = await import("../src/page/attachments.js");
     const asked = [];
-    const tools = { runner: { run: async (call) => { asked.push(call.arguments); return "» find_files\n[\"a/b.go\"]"; } }, catalogue: { active: () => [] } };
+    const tools = { runner: { run: async (call) => { asked.push(call.arguments); return { text: "I ran `find_files` for you.", body: "[\"a/b.go\"]", isError: false }; } }, catalogue: { active: () => [] } };
     const state = { filesChangedAt: 0 };
     const attachments = createAttachments({ provider: {}, state, tools, chat: {}, bar: {}, budget: {}, parts: {}, preferences: { excludedFolders: () => ["tmp", ".rustup"] }, startTurn() {}, diag() {} });
     assert.deepEqual((await attachments.listFiles()).paths, ["a/", "a/b.go"]);

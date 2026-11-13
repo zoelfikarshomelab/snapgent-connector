@@ -4,6 +4,7 @@
 // merely PRESENT on the page, so every guard below says why it did not (`resume.skip`, logged when the reason changes).
 
 import { hasToolSignature, isInjectedFeedback, parseToolCalls } from "../domain/parser/index.js";
+import { matchesShape } from "../domain/tools/result-marker.js";
 
 const FRESH_MS = 180000; // a long generation can outlast the loop; the command must still run once it ends
 const TICK_MS = 1000;
@@ -32,7 +33,7 @@ export function createAutoResume({ document, state, provider, executed, loop, di
     // Every command that ran is followed by our result turn: that separates the pending command from settled history.
     const all = provider.allItems();
     const after = all[all.indexOf(item) + 1];
-    if (after && provider.isUserItem(after) && isInjectedFeedback(provider.itemText(after))) return skip("resultBelow");
+    if (after && provider.isUserItem(after) && isInjectedFeedback(provider.itemText(after), (t) => matchesShape(state.injected, t))) return skip("resultBelow");
     const text = provider.itemText(item);
     if (!hasToolSignature(text)) return skip("noSignature");
     if (executed.has(item, text)) return skip("alreadyExecuted");

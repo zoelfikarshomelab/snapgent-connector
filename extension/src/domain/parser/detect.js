@@ -48,11 +48,14 @@ export function toolNameFromText(txt) {
 }
 
 // A turn the EXTENSION injected (always sent as a user turn): a tool result, an
-// ERROR, or a "(System note: …)" control message. Matched ONLY by the fixed
+// ERROR, or a "(A note from me: …)" control message. Matched ONLY by the fixed
 // shapes we emit - never by command-like keywords, since a parse-error note
 // quotes a {"command": …} example that must NOT be read as a real command.
-export function isInjectedFeedback(txt) {
+// `isKnown` is the page's own memory of what it sent: the wording of those
+// messages is the user's, so their shape cannot be told apart from any other.
+export function isInjectedFeedback(txt, isKnown = () => false) {
   return startsWithResult(txt) ||
          /^\s*ERROR\b/.test(txt) ||
-         /^\s*\(System note:/.test(txt);
+         /^\s*\(A note from me:/.test(txt) ||
+         isKnown(txt);
 }

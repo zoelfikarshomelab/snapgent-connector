@@ -32,6 +32,10 @@ export const createState = () => ({
   maxTurnId: null,
   sendToken: undefined, // the last reply's identity before our send
 
+  // The messages the extension sent into this chat, as short shapes (see domain/tools/result-marker.js). The wording of those
+  // messages is the user's, so this is how the page recognises its own turns: a rewritten template still reads as ours.
+  injected: [],
+
   // The extension.
   bridge: { connected: false, mcpAlive: false, tools: 0 },
   staleExtension: false, // the page outlived its extension build; nothing works until a reload

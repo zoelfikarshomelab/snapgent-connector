@@ -92,7 +92,7 @@ describe("commands typed into the terminal", () => {
   test("a typed command runs under its own tab and shows its result", async () => {
     const page = setup();
     const seen = [];
-    page.t.setRunner(async (call, options) => { seen.push({ call, options }); return "OK done"; });
+    page.t.setRunner(async (call, options) => { seen.push({ call, options }); return { text: "OK done", body: "OK done", isError: false }; });
     page.submit('{"command":"git_status","params":{}}');
     await tick();
     assert.equal(seen.length, 1);
@@ -106,7 +106,7 @@ describe("commands typed into the terminal", () => {
   test("several typed commands run in order", async () => {
     const page = setup();
     const order = [];
-    page.t.setRunner(async (call) => { order.push(call.tool); return "fine"; });
+    page.t.setRunner(async (call) => { order.push(call.tool); return { text: "fine", body: "fine", isError: false }; });
     page.submit('{"command":"git_add","params":{"paths":["a"]}}\n{"command":"git_commit","params":{"message":"x"}}');
     await tick();
     assert.deepEqual(order, ["git_add", "git_commit"]);
@@ -119,7 +119,7 @@ describe("commands typed into the terminal", () => {
     page.t.setRunner(async (call, { jobKey }) => {
       order.push(call.tool);
       page.t.finish(jobKey, "failed", "ERROR: boom");
-      return "ERROR: boom";
+      return { text: "ERROR: boom", body: "ERROR: boom", isError: true };
     });
     page.submit('{"command":"git_add","params":{}} {"command":"git_commit","params":{"message":"x"}}');
     await tick();
@@ -129,7 +129,7 @@ describe("commands typed into the terminal", () => {
   test("text without a command is refused and kept for fixing", async () => {
     const page = setup();
     let ran = 0;
-    page.t.setRunner(async () => { ran += 1; return "x"; });
+    page.t.setRunner(async () => { ran += 1; return { text: "x", body: "x", isError: false }; });
     page.submit("hello there");
     await tick();
     assert.equal(ran, 0);

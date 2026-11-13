@@ -4,9 +4,9 @@
 
 import { SkillsService, ToolCatalogue, ToolRunner, chooseWorkspace } from "../application/index.js";
 import { bareToolName } from "../domain/tools/names.js";
-import { buildSystemPrompt } from "../domain/prompt/system-prompt.js";
+import { buildPromptValues } from "../domain/prompt/system-prompt.js";
+import { buildBrief } from "../domain/prompt/start-message.js";
 import { toolsReminder } from "../domain/prompt/reminder.js";
-import { withoutResultHeader } from "../domain/tools/result-marker.js";
 import { ROOT_ARGUMENT } from "../domain/tools/confirmation.js";
 import { createChoiceDialog, createConfirmDialog } from "../ui/index.js";
 import { chooseRemoteWorkspace } from "../application/remote-workspace.js";
@@ -15,10 +15,12 @@ import { createWorkspaceBinding } from "./workspace-binding.js";
 
 /**
  * @param {{ send: Function, provider: object, state: object, settings: object, serverDirectory: object, visibility: object,
- *           storage: object, diag: Function, banner: Function, terminal?: object, accountKey?: () => string, calls?: () => number, excludedFolders?: () => string[] }} deps  `banner(level, title, text)`
- *   shows the user a notice; `terminal` receives the live output of commands (see page/terminal.js); `calls` reads the effective Commands per reply (general preference, or this site's own)
+ *           storage: object, diag: Function, banner: Function, terminal?: object, accountKey?: () => string, calls?: () => number, excludedFolders?: () => string[],
+ *           templates?: () => Record<string, string> }} deps  `banner(level, title, text)`
+ *   shows the user a notice; `terminal` receives the live output of commands (see page/terminal.js); `calls` reads the effective Commands per reply (general preference, or this site's own);
+ *   `templates` reads the wording the user gave the messages the AI reads
  */
-export function createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner, terminal = null, accountKey = () => "", calls = null, excludedFolders = () => [], browseRemote = async () => null }) {
+export function createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner, terminal = null, accountKey = () => "", calls = null, excludedFolders = () => [], browseRemote = async () => null, templates = () => ({}) }) {
   const bridge = {
     listTools: () => send({ type: "list_tools" }),
     callTool: (request) => send({ type: "call_tool", ...request }),
@@ -45,10 +47,10 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
   // A chat's folder is a path on one machine: the folder of this computer is never sent to an SSH server (and the other way round).
   const bindings = createWorkspaceBinding({ storage, provider, accountKey, serverKey: () => workspaceServerOf(settings.target()) || "" });
   const choice = createChoiceDialog();
-  const runner = new ToolRunner({ bridge, catalogue, session, visibility, sink, confirm, approvalMode: settings.approvalMode, workspaceRoot: bindings.current, excludedFolders });
+  const runner = new ToolRunner({ bridge, catalogue, session, visibility, sink, confirm, approvalMode: settings.approvalMode, workspaceRoot: bindings.current, excludedFolders, templates: () => templates() });
   // Commands the user types into the terminal run apart from the agent loop: a Stop that ended the loop leaves
   // `state.stop` set, and that must not cancel what the user runs by hand afterwards.
-  const manual = new ToolRunner({ bridge, catalogue, session: { ...session, isStopped: () => false }, visibility, sink, confirm, approvalMode: settings.approvalMode, workspaceRoot: bindings.current, excludedFolders });
+  const manual = new ToolRunner({ bridge, catalogue, session: { ...session, isStopped: () => false }, visibility, sink, confirm, approvalMode: settings.approvalMode, workspaceRoot: bindings.current, excludedFolders, templates: () => templates() });
   const skills = new SkillsService({
     store: storage,
     findTool: (bareName) => catalogue.active().find((tool) => bareToolName(tool.name) === bareName),
@@ -104,16 +106,16 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
     },
     async refresh() {
       state.filesChangedAt = Date.now(); // another folder: the files listed before are not its files
-      const feedback = await runner.run({ tool: "get_workspace_info" });
+      const answer = await runner.run({ tool: "get_workspace_info" });
       try {
-        const info = JSON.parse(withoutResultHeader(feedback));
+        const info = JSON.parse(answer.body);
         workspaceInfo = { name: info.name, path: info.path, git: !!info.is_git_repository };
       } catch { workspaceInfo = null; } // a target without that command: the prompt then speaks of "this folder"
     },
   };
 
-  /** The instructions for this workspace and these settings: one definition for the start and for any re-statement. */
-  const systemPrompt = () => buildSystemPrompt({
+  /** The facts the messages are written around: the project, the target and the limit on one reply. */
+  const promptValues = () => buildPromptValues({
     workspace: workspaceInfo,
     targetName: serverDirectory.name(settings.target()),
     customPrompt: serverDirectory.customPrompt,
@@ -121,8 +123,11 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
     calls: calls ? calls() : undefined,
   });
 
-  /** The command list the model is reminded of every so often, scoped to the selected target, with the Commands per reply it may carry. */
-  const reminderText = () => toolsReminder(catalogue.active(), serverDirectory.name(settings.target()), settings.target(), calls ? calls() : undefined);
+  /** The standing instructions: the start template without the parts of a session. */
+  const brief = () => buildBrief({ template: templates().start, values: promptValues() });
 
-  return { bridge, session, catalogue, confirm, runner, manual, skills, workspace, systemPrompt, reminderText };
+  /** The command list the model is reminded of every so often, scoped to the selected target, with the Commands per reply it may carry. */
+  const reminderText = () => toolsReminder(templates().reminder, catalogue.active(), serverDirectory.name(settings.target()), settings.target(), calls ? calls() : undefined);
+
+  return { bridge, session, catalogue, confirm, runner, manual, skills, workspace, promptValues, brief, reminderText, templates };
 }

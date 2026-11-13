@@ -5,6 +5,7 @@
 
 import { planReplay } from "../domain/agent/agent-mode.js";
 import { isInjectedFeedback } from "../domain/parser/index.js";
+import { matchesShape } from "../domain/tools/result-marker.js";
 
 const MESSAGES = {
   generating: "The AI is still writing · wait for it to finish",
@@ -18,7 +19,8 @@ export function createReplay({ state, provider, executed, progress = null, loop,
   function answered(item) {
     const all = provider.allItems();
     const after = all[all.indexOf(item) + 1];
-    return !!(after && provider.isUserItem(after) && isInjectedFeedback(provider.itemText(after)));
+    const text = after ? provider.itemText(after) : "";
+    return !!(after && provider.isUserItem(after) && isInjectedFeedback(text, (t) => matchesShape(state.injected, t)));
   }
 
   function play() {

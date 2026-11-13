@@ -34,13 +34,14 @@ export function createBarSettings({ document, root, settings, serverDirectory, t
     onFillTest: calibration.fillTestText,
     onFillStartMessage: calibration.fillStartMessage,
     onFillReminder: calibration.fillReminderMessage,
+    onFillTemplate: calibration.fillTemplate,
     onAttachTest: calibration.attachTestFile,
   });
 
   async function openPreferencesDialog() {
     openPreferences({
-      document, values: { ...(await preferences.read()), site: calibration.limits() }, defaults: { folders: preferences.defaultFolders(), contextFiles: preferences.defaultContextFiles() },
-      save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders, contextFiles: preferences.setContextFiles, asFile: preferences.setAsFile, startContext: preferences.setStartContext, startTree: preferences.setStartTree, site: calibration.setLimits },
+      document, values: { ...(await preferences.read()), site: calibration.limits() }, defaults: { folders: preferences.defaultFolders(), contextFiles: preferences.defaultContextFiles(), templates: preferences.defaultTemplates() },
+      save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders, contextFiles: preferences.setContextFiles, asFile: preferences.setAsFile, startContext: preferences.setStartContext, startTree: preferences.setStartTree, templates: preferences.setTemplates, site: calibration.setLimits },
       actions: actions(),
     });
   }

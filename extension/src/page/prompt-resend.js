@@ -6,21 +6,25 @@
 
 import { PromptResender, SysTally } from "../application/index.js";
 import { countSinceLastMarker } from "../domain/prompt/resend.js";
+import { isInjectedFeedback } from "../domain/parser/index.js";
+import { matchesShape } from "../domain/tools/result-marker.js";
 
 const FALLBACK_IDLE_MS = 20000;
 const FALLBACK_CHECK_MS = 5000;
 
-/** @param {{ provider: object, state: object, storage: object, systemPrompt: () => string, limit: () => number, chat: object, diag: Function }} deps */
-export function createPromptResend({ provider, state, storage, systemPrompt, limit, chat, diag }) {
+/** @param {{ provider: object, state: object, storage: object, rider: () => string, limit: () => number, chat: object, diag: Function }} deps
+ *  `rider` is the note that repeats the instructions (the user's wording, see domain/prompt/templates.js). */
+export function createPromptResend({ provider, state, storage, rider, limit, chat, diag }) {
   const tally = new SysTally({ storage, conversationKey: () => provider.conversationKey(), enabled: !!provider.resendSystemEvery });
   const resender = new PromptResender({
     tally,
     everyUsers: provider.resendSystemEvery || 0,
-    systemPrompt,
+    rider,
     // What is on screen is a floor under the stored tally (a session adopted from another device, cleared storage).
     domCounts: () => {
       const items = provider.allItems();
-      return countSinceLastMarker(items.length, (i) => ({ text: provider.itemText(items[i]), isUser: provider.isUserItem(items[i]) }));
+      const isInjected = (text) => isInjectedFeedback(text, (t) => matchesShape(state.injected, t));
+      return countSinceLastMarker(items.length, (i) => ({ text: provider.itemText(items[i]), isUser: provider.isUserItem(items[i]) }), isInjected);
     },
     charBudget: limit,
     diag,
@@ -33,7 +37,7 @@ export function createPromptResend({ provider, state, storage, systemPrompt, lim
     if (Date.now() - state.lastGenAt < FALLBACK_IDLE_MS) return; // give the free path (riding on a result) a fair chance first
     resender.claim("ownTurn");
     try {
-      await chat.waitForResponse(await chat.submit(systemPrompt()));
+      await chat.waitForResponse(await chat.submit(rider()));
     } catch (error) {
       diag("sys.resendFailed", { err: String((error && error.message) || error) });
     }

@@ -73,6 +73,7 @@
  * @typedef {Object} LoopToolsPort  Tool-related state the loop reads and updates.
  * @property {() => boolean} hasCatalogue
  * @property {() => string} reminderText
+ * @property {() => Record<string, string>} [templates]  the user's wording for the messages the AI reads
  */
 
 /**

@@ -8,10 +8,11 @@ import { createCalibrationWizard, openCalibrationImport, downloadText, chooseTex
 import { learnProfile, profileProblems, updateProfile, createCalibratedProvider } from "../infrastructure/calibration/index.js";
 import { describeElement } from "../infrastructure/chat/index.js";
 import { loremIpsum } from "../domain/prompt/lorem.js";
+import { renderTemplate, sampleValues } from "../domain/prompt/templates.js";
 import { defaultBeep } from "./captcha-alert.js";
 
-/** @param {{ document: Document, location: Location, provider: object, state: object, storage: object, settings: object, toast: (text: string) => void, previewStartMessage?: () => Promise<string|null>, previewReminderMessage?: () => Promise<string|null> }} deps */
-export function createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast, previewStartMessage = null, previewReminderMessage = null }) {
+/** @param {{ document: Document, location: Location, provider: object, state: object, storage: object, settings: object, toast: (text: string) => void, previewStartMessage?: () => Promise<string|null>, previewReminderMessage?: () => Promise<string|null>, previewBrief?: () => string }} deps */
+export function createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast, previewStartMessage = null, previewReminderMessage = null, previewBrief = null }) {
   const store = new ProfileStore({
     store: { get: storage.get, set: storage.commit },
     problemsOf: profileProblems,
@@ -123,6 +124,19 @@ export function createCalibrationActions({ document, location, provider, state, 
     } catch (error) { toast(String((error && error.message) || error)); }
   }
 
+  /** An example of one of the templates, written into the text box the way the extension writes its own messages, and not sent. */
+  async function fillTemplate(name, templateText) {
+    if (provider.needsCalibration) { toast("Calibrate this site first."); return; }
+    const values = sampleValues(name);
+    if (name === "resend" && previewBrief) values.brief = previewBrief();
+    const text = renderTemplate(templateText || "", values);
+    if (!text) { toast("There is nothing to show for this template."); return; }
+    try {
+      const via = await provider.writeText(text);
+      toast(`Wrote ${text.length.toLocaleString("en-US")} characters of ${name} into the text box (via ${via}). Not sent.`);
+    } catch (error) { toast(String((error && error.message) || error)); }
+  }
+
   /** Filler text as a .txt file given to the page by `method` (paste, input or drop), and not sent. */
   async function attachTestFile(chars, method) {
     if (provider.needsCalibration) { toast("Calibrate this site first."); return; }
@@ -171,5 +185,5 @@ export function createCalibrationActions({ document, location, provider, state, 
   // undefined: not calibrated, so nothing to keep them in; null: calibrated, no values of its own.
   const limits = () => (provider.needsCalibration ? undefined : provider.limits || null);
 
-  return { testCaptchaSound, limits, setLimits, copyTestText, fillTestText, fillStartMessage, fillReminderMessage, attachTestFile, open, exportProfile, importProfile, exportAll, importAll, remove, copyDiagnostics };
+  return { testCaptchaSound, limits, setLimits, copyTestText, fillTestText, fillStartMessage, fillReminderMessage, fillTemplate, attachTestFile, open, exportProfile, importProfile, exportAll, importAll, remove, copyDiagnostics };
 }

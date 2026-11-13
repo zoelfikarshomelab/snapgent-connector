@@ -5,6 +5,7 @@
 
 import { LEGACY_SESSION_MARKER, SESSION_PHRASE } from "../constants.js";
 import { isInjectedFeedback } from "../parser/detect.js";
+import { renderTemplate } from "./templates.js";
 
 /** Injected tool results measure context VOLUME, which is what makes a site summarise. */
 export const RESEND_RESULTS_EVERY = 12;
@@ -19,14 +20,8 @@ export function isResendDue({ users, results }, { everyUsers, everyResults = RES
 export const fitsBudget = (resultLength, riderLength, cap = Infinity) => resultLength + riderLength <= cap;
 
 /** The passenger appended to a tool result: the instructions again, framed as a reminder and not a request. */
-export function buildResendRider(prompt) {
-  return (
-    "\n\n---\n" +
-    "(A reminder from me, not a new request: there is nothing to answer here. In a long conversation this can get lost, so here is how we are working " +
-    "together once more. The commands do run on my machine, and what they return is what you have been getting from me. Just carry on with the task; " +
-    "do not acknowledge this note.)\n\n" +
-    prompt
-  );
+export function buildResendRider(template, brief) {
+  return renderTemplate(template, { brief });
 }
 
 /**
@@ -35,15 +30,16 @@ export function buildResendRider(prompt) {
  * Items are read lazily, newest first, so a long history is never fully classified.
  * @param {number} length number of turns on screen
  * @param {(index: number) => { text: string, isUser: boolean }} itemAt oldest-first accessor
+ * @param {(text: string) => boolean} [isInjected] knows our own messages (the page remembers what it sent)
  */
-export function countSinceLastMarker(length, itemAt) {
+export function countSinceLastMarker(length, itemAt, isInjected = isInjectedFeedback) {
   let users = 0;
   let results = 0;
   for (let i = length - 1; i >= 0; i--) {
     const { text, isUser } = itemAt(i);
     if (text.includes(SESSION_PHRASE) || text.includes(LEGACY_SESSION_MARKER)) break;
     if (!isUser) continue;
-    if (isInjectedFeedback(text)) results++;
+    if (isInjected(text)) results++;
     else users++;
   }
   return { users, results };

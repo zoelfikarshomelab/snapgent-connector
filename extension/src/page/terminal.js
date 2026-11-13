@@ -13,7 +13,7 @@ import { feed, state as freshState } from "../ui/ansi.js";
 import { parseToolCalls } from "../domain/parser/index.js";
 import { jobKey } from "../domain/tools/job-key.js";
 import { formatClock, formatDuration } from "../domain/tools/run-times.js";
-import { feedbackIsError, runningDetail } from "../domain/tools/result-summary.js";
+import { runningDetail } from "../domain/tools/result-summary.js";
 
 const MAX_TABS = 20; // finished commands remembered before the oldest is dropped
 const MAX_COPY_LINES = 5000; // streamed lines kept per tab for Copy
@@ -175,9 +175,9 @@ export function createTerminal({ document, diag, onChange = () => {}, copy = (te
       const key = jobKey(batchId, index, call);
       // The runner opens the tab itself only for commands the server streams; this one covers the rest.
       begin({ key, name: call.tool, label: runningDetail({ arguments: call.arguments }) });
-      let feedback;
-      try { feedback = await runner(call, { jobKey: key }); } catch (error) { feedback = `ERROR: ${(error && error.message) || error}`; }
-      finish(key, feedbackIsError(feedback) ? "failed" : "success", feedback);
+      let answer;
+      try { answer = await runner(call, { jobKey: key }); } catch (error) { answer = { text: `ERROR: ${(error && error.message) || error}`, body: "", isError: true }; }
+      finish(key, answer.isError ? "failed" : "success", answer.text);
       const tab = tabs.get(key);
       if (!tab || tab.status !== "success") break;
     }

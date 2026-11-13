@@ -8,11 +8,14 @@
 
 import { planTurn } from "../domain/agent/turn-policy.js";
 import { FEEDBACK } from "../domain/prompt/feedback.js";
+import { renderTemplate } from "../domain/prompt/templates.js";
 import { DEFAULT_PROMPT_CHARS } from "../domain/prompt/budget.js";
 import { BatchRunner } from "./batch-runner.js";
 import { StallWatchdog } from "./stall-watchdog.js";
 
 const WATCHDOG_STALL_MESSAGE = ["Agent stopped waiting", "No progress for 3 min. Send continue to resume."];
+// The call the model should write, shown when its command could not be read at all.
+const CALL_EXAMPLE = '{"command": "name", "params": { ...your parameters... }}';
 
 export class AgentLoop {
   /**
@@ -87,7 +90,7 @@ export class AgentLoop {
         }
         if (plan.type === "parse-error") {
           if (this._d.view.progress) this._d.view.progress("The command could not be read · asking the AI to send it again…");
-          base = await this._d.chat.submit(plan.feedback);
+          base = await this._d.chat.submit(this._failure(plan.feedback));
           continue;
         }
         const outcome = await this._batch.run(res.item, plan.calls);
@@ -107,6 +110,15 @@ export class AgentLoop {
   }
 
   // ── pieces ──────────────────────────────────────────────────────────────
+
+  /** A command that could not be read: the user's wording for a failure, with the reason and the call that works. */
+  _failure(reason) {
+    const templates = this._d.tools && this._d.tools.templates ? this._d.tools.templates() : {};
+    const template = templates.error;
+    if (!template) return reason;
+    const text = renderTemplate(template, { command: "the command you wrote", name: "", error: reason, example: CALL_EXAMPLE });
+    return text.includes(CALL_EXAMPLE) ? text : `${text}\n\n${CALL_EXAMPLE}`;
+  }
 
   /** Never read/parse/execute off-screen. Returns false only if the user stopped while parked. */
   async _parkWhileHidden(scope, extra) {

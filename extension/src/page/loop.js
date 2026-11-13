@@ -56,7 +56,7 @@ export function createLoop({ state, provider, tools, chat, bar, visibility, exec
     lifecycle,
     visibility,
     runner: tools.runner,
-    tools: { hasCatalogue: () => tools.catalogue.hasAny(), reminderText: tools.reminderText },
+    tools: { hasCatalogue: () => tools.catalogue.hasAny(), reminderText: tools.reminderText, templates: tools.templates },
     memory: { executed: (item) => executed.remember(item), forget: (item) => executed.forget(item) },
     outbox: {
       // A result is a turn: it counts toward the system-prompt re-statement budget and may carry it.

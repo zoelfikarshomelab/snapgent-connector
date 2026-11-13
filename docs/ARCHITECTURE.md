@@ -47,9 +47,10 @@ extension/
     sites/registry.js        ONE list of supported sites -> manifest, background, popup, the switch-AI menu
     domain/
       parser/                markers · json-scan · tool-call (every command of a reply) · salvage · detect
-      prompt/                system-prompt · feedback · reminder · resend · budget (size of one message) · file-tags (@path)
-      tools/                 catalogue · result-marker (the "» name" line) · result-summary · result-feedback · job-key
-                             names · isolation · confirmation · virtual-commands
+      prompt/                templates (the wording the user may rewrite) · system-prompt · feedback · reminder · resend
+                             budget (size of one message) · file-tags (@path)
+      tools/                 catalogue · command-line (the command as it is typed) · command-message · result-marker
+                             result-summary · result-feedback · job-key · names · isolation · confirmation · virtual-commands
       agent/                 turn-policy · reply-classifier · session-start
       skills/                skill-text
     application/             AgentLoop · BatchRunner · ResponseWatcher · MessageSender · SessionStarter · ToolRunner
@@ -79,7 +80,8 @@ extension/
    message-size budget; a failure, a stop or a full budget ends the batch and the rest is listed as not run.
 4. `ToolRunner` calls the bridge under the user's approval mode. The VS Code server keeps each non-reading command as a job under its
    key, so a page reloaded mid-batch picks the batch up again instead of running it twice, and Stop can end the process.
-5. The results go back as ONE message (`MessageSender`), each under its own `» name` line.
+5. The results go back as ONE message (`MessageSender`). Each result reads like a chat: the command as it would be typed, then what it
+   returned — written from the user's templates (`domain/prompt/templates.js`, editable in the preferences).
 
 ### Principles and where they are enforced
 

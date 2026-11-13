@@ -6,7 +6,7 @@
 // ones (PartQueue; the model is told to acknowledge briefly meanwhile). Nothing after a failure, an image or a stop runs. Every command carries a job key (batch id + place + content), so when the page is reloaded mid-batch and the
 // reply is run again, commands that already ran are answered from the server's record instead of running twice.
 
-import { feedbackIsError, runningLabel } from "../domain/tools/result-summary.js";
+import { runningLabel } from "../domain/tools/result-summary.js";
 import { jobKey } from "../domain/tools/job-key.js";
 import { DEFAULT_BATCH_CALLS, MAX_RESULT_PARTS, MIN_CALL_CHARS, callShare, composeBatch, sessionIsLarge, trimMiddle } from "../domain/prompt/budget.js";
 import { partMessages } from "../domain/prompt/parts.js";
@@ -139,11 +139,12 @@ export class BatchRunner {
     view.toolRunning(item, call);
     memory.executed(item);
     this._diag("tool.start", { name: call.tool });
-    const feedback = await runner.run(call, { budgetChars, jobKey: key });
+    const answer = await runner.run(call, { budgetChars, jobKey: key });
     view.toolFinished();
     if (lifecycle.isStopped()) return { halted: true };
 
-    const isErr = feedbackIsError(feedback);
+    const feedback = answer.text;
+    const isErr = answer.isError;
     this._diag("tool.done", { name: call.tool, isErr, chars: feedback.length, firstLine: feedback.split("\n", 2).join(" | ").slice(0, 90) });
     return { feedback, isErr };
   }

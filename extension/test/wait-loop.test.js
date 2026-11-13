@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { ToolCatalogue } from "../src/application/tool-catalogue.js";
 import { ToolRunner } from "../src/application/tool-runner.js";
 import { WAIT_STUCK_MINUTES, waitOut } from "../src/application/wait-loop.js";
+import { DEFAULT_TEMPLATES } from "../src/domain/prompt/templates.js";
 import { fakeBridge, fakeSession, fakeSink, fakeTimers, fakeVisibility, tool } from "./support/fakes.js";
 
 const running = (body) => ({ ok: true, text: `⏳ Still running (1 min 30 s so far, run_id r7). Output since your last look:\n${body}\nWait again with wait_command, or end it with stop_command.` });
@@ -88,12 +89,12 @@ describe("ToolRunner: wait_command", () => {
     });
     const session = fakeSession();
     const catalogue = new ToolCatalogue({ bridge, session, now: timers.now });
-    const runner = new ToolRunner({ bridge, catalogue, session, visibility: fakeVisibility(), sink: fakeSink(), timers });
-    const text = await runner.run({ tool: "wait_command", arguments: { run_id: "r7", wait_seconds: 5 } });
+    const runner = new ToolRunner({ bridge, catalogue, session, visibility: fakeVisibility(), sink: fakeSink(), timers, templates: () => DEFAULT_TEMPLATES });
+    const answer = await runner.run({ tool: "wait_command", arguments: { run_id: "r7", wait_seconds: 5 } });
     assert.equal(bridge.calls.length, 3);
     assert.ok(bridge.calls.every((call) => call.arguments.wait_seconds === 90 && call.arguments.run_id === "r7"));
-    assert.ok(text.startsWith("» wait_command"));
-    assert.match(text, /Finished with exit code 0/);
-    assert.ok(text.includes("part 1") && text.includes("part 2") && text.includes("last"));
+    assert.ok(answer.text.startsWith("I ran `wait_command r7"));
+    assert.match(answer.body, /Finished with exit code 0/);
+    assert.ok(answer.body.includes("part 1") && answer.body.includes("part 2") && answer.body.includes("last"));
   });
 });

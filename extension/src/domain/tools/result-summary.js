@@ -40,10 +40,14 @@ export function runningLabel(call, step) {
 const BODY_ERR_RE =
   /^\s*(error executing|error:|erreur|exception|traceback|communication error|failed to|could ?not|cannot |unable to|fatal)\b/i;
 
-/** Our own wrapper (`ERROR …`) or a tool's in-body error lead-in. */
+// The call the model should write: it is in every message about a failed command, and it is what tells a failure apart.
+const CALL_LINE = /^\s*\{"command":\s*"[^"]+"\s*,\s*"params"/;
+
+/** Our own wrapper (`ERROR …`), the call that shows a command failed, or a tool's in-body error lead-in. */
 export function feedbackIsError(feedback) {
   if (!feedback) return false;
   if (feedback.startsWith("ERROR")) return true;
+  if (feedback.split("\n").some((line) => CALL_LINE.test(line))) return true;
   const first = withoutResultHeader(feedback).split("\n").map((line) => line.trim()).find(Boolean) || "";
   return BODY_ERR_RE.test(first);
 }

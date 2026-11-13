@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The preferences panel: message size, commands per reply, the folders left out of the attachable files, and the project instruction
-// files the agent reads at a start. Each change is saved as it is made. Opened from the menu behind the "switch AI" pill.
+// The preferences panel: message size, commands per reply, the wording of the messages the extension sends to the AI, the folders
+// left out of the attachable files, and the project instruction files the agent reads at a start. Each change is saved as it is
+// made. Opened from the menu behind the "switch AI" pill.
 
 import { MAX_BATCH_CALLS, MAX_PROMPT_CHARS, MIN_BATCH_CALLS, MIN_PROMPT_CHARS } from "../domain/prompt/budget.js";
 import { DEFAULT_CONTEXT_FILES } from "../domain/prompt/context-file.js";
 import { parseFolderNames } from "../domain/prompt/excluded-folders.js";
+import { DEFAULT_TEMPLATES, TEMPLATE_NAMES, placeholderList } from "../domain/prompt/templates.js";
 import { escapeHtml as esc, setHtml } from "./html.js";
 import { closeButton, mountPopup } from "./popup.js";
 
@@ -20,15 +22,26 @@ const slider = (id, label, min, max, step, note) =>
   `<input type="range" id="${id}" min="${min}" max="${max}" step="${step}" style="width:100%;box-sizing:border-box;margin:8px 0 2px" aria-label="${label}">` +
   `<div class="zs-mcp-pop-note">${note}</div></div>`;
 
+// What each template is for, and what the user may put in it.
+const TEMPLATE_NOTES = {
+  start: ["Start message", "The first message of a session: how we work together, the commands you may use, the project tree and the instructions of the project. It ends with the question that asks the AI to answer with one word and wait."],
+  reminder: ["Reminder", "A short note under a result now and then, so a long chat does not lose the exact command names. It is a note for the AI, not one of your messages."],
+  result: ["A command that worked", "What the AI reads when a command ran fine: the command as it would be typed, and what it returned."],
+  error: ["A command that failed", "What the AI reads when a command did not work: the command, what went wrong, and the call as it should be written."],
+  resend: ["Reminder in a long chat", "The instructions again, sent to the AI in a long conversation when it starts to forget how we work. It rides along under a result."],
+};
+
 /**
  * @param {{ document: Document,
- *           values: { chars: number, calls: number, folders: string[], contextFiles?: string[] },
- *           defaults: { folders: string[], contextFiles?: string[] },
- *           save: { chars: (value: number) => void, calls: (value: number) => void, folders: (list: string[]) => void, contextFiles?: (list: string[]) => void } }} deps
+ *           values: { chars: number, calls: number, folders: string[], contextFiles?: string[], templates?: Record<string, string> },
+ *           defaults: { folders: string[], contextFiles?: string[], templates?: Record<string, string> },
+ *           save: { chars: (value: number) => void, calls: (value: number) => void, folders: (list: string[]) => void, contextFiles?: (list: string[]) => void, templates?: (all: Record<string, string>) => void } }} deps
  */
 export function openPreferences({ document, values, defaults, save, actions = {} }) {
   const contextFiles = values.contextFiles || [];
   const defaultContextFiles = defaults.contextFiles || DEFAULT_CONTEXT_FILES;
+  const templates = { ...DEFAULT_TEMPLATES, ...(values.templates || {}) };
+  const defaultTemplates = { ...DEFAULT_TEMPLATES, ...(defaults.templates || {}) };
   const { pop, close } = mountPopup(document);
   const row = (id, title, note = "") =>
     `<button class="zs-site-opt" id="${id}" type="button"><span class="zs-site-name"><span>${title}</span>` +
@@ -58,6 +71,31 @@ export function openPreferences({ document, values, defaults, save, actions = {}
       row("zs-cal-export-all", "Export all calibrations", "one file, kept apart per AI") +
       row("zs-cal-import-all", "Import calibrations…", "choose which AIs to take from the files") + `</section>`
     : "";
+  // One field per template, each with the button that writes it into the text box, right under it.
+  const templateField = (name) => {
+    const [title, note] = TEMPLATE_NOTES[name] || [name, ""];
+    const fill = actions.onFillTemplate
+      ? `<button id="zs-pref-tpl-${name}-fill" type="button" class="zs-mcp-pop-btn zs-mcp-pop-btn-block" style="margin-top:6px">Fill the text box with an example</button>`
+      : "";
+    return `<div class="zs-pref"><div style="font-weight:600">${title}</div>` +
+      `<div class="zs-mcp-pop-note">${note}</div>` +
+      `<textarea id="zs-pref-tpl-${name}" rows="8" spellcheck="false" style="width:100%;box-sizing:border-box;margin-top:8px;${MONO};background:transparent;color:inherit;${BOX};padding:6px" ` +
+      `aria-label="${title}">${esc(templates[name] || "")}</textarea>` +
+      `<div class="zs-mcp-pop-note">You may use ${placeholderList(name)}. A paragraph whose value is empty is left out of the message.</div>` +
+      fill + `</div>`;
+  };
+  const templateSection =
+    `<div class="zs-pref"><div style="font-weight:600">The wording of the messages the AI reads</div>` +
+    `<div class="zs-mcp-pop-note">These are the messages the extension sends to the AI: the start of a session, the reminder, and what a command returns. Write them as you would say it in a chat. Each change is saved as it is made.</div></div>` +
+    TEMPLATE_NAMES.map(templateField).join("") +
+    (actions.onFillStartMessage
+      ? `<div class="zs-pref"><button id="zs-pref-start-fill" type="button" class="zs-mcp-pop-btn zs-mcp-pop-btn-block">Fill the text box with the real start message</button>` +
+        `<div class="zs-mcp-pop-note">Writes the exact message the Start button would send (instructions, commands, project tree) into the text box, without sending it or starting a session. Check it there, then press Start in a new chat to send it for real.</div></div>`
+      : "") +
+    (actions.onFillReminder
+      ? `<div class="zs-pref"><button id="zs-pref-reminder-fill" type="button" class="zs-mcp-pop-btn zs-mcp-pop-btn-block">Fill the text box with the real reminder</button>` +
+        `<div class="zs-mcp-pop-note">Writes the automatic reminder the AI gets under a result now and then (the command list and how many commands one reply may carry) into the text box, without sending it.</div></div>`
+      : "");
   setHtml(pop,
     `<div class="zs-mcp-pop-card zs-pref-card" role="dialog" aria-label="Preferences"><div class="zs-mcp-pop-head"><span>Preferences</span>${closeButton}</div>` +
     `<div class="zs-mcp-pop-body">` +
@@ -72,16 +110,7 @@ export function openPreferences({ document, values, defaults, save, actions = {}
         (actions.onFillTest ? `<button id="zs-pref-lorem-fill" type="button" class="zs-mcp-pop-btn zs-mcp-pop-btn-block" style="margin-top:6px">Fill the text box</button>` : "") +
         (actions.onAttachTest ? `<select id="zs-pref-lorem-method" aria-label="How to attach the file" style="margin-top:6px;width:100%"><option value="paste">as a pasted file</option><option value="input">through the file input</option><option value="drop">as a dropped file</option></select><button id="zs-pref-lorem-file" type="button" class="zs-mcp-pop-btn zs-mcp-pop-btn-block" style="margin-top:6px">Fill the text box with a .txt file</button>` : "") + `</div>`
       : "") +
-    (actions.onFillStartMessage
-      ? `<div class="zs-pref"><div style="font-weight:600">Test the Start message</div>` +
-        `<div class="zs-mcp-pop-note">Writes the exact message the Start button would send (instructions, commands, project tree) into the text box, without sending it or starting a session. Check it there, then press Start in a new chat to send it for real.</div>` +
-        `<button id="zs-pref-start-fill" type="button" class="zs-mcp-pop-btn zs-mcp-pop-btn-block" style="margin-top:6px">Fill the text box with the start message</button></div>`
-      : "") +
-    (actions.onFillReminder
-      ? `<div class="zs-pref"><div style="font-weight:600">Test the reminder message</div>` +
-        `<div class="zs-mcp-pop-note">Writes the automatic reminder the AI gets under a result now and then (the command list and how many commands one reply may carry) into the text box, without sending it. It is a note for the AI, not one of your messages.</div>` +
-        `<button id="zs-pref-reminder-fill" type="button" class="zs-mcp-pop-btn zs-mcp-pop-btn-block" style="margin-top:6px">Fill the text box with the reminder</button></div>`
-      : "") +
+    templateSection +
     `<div class="zs-pref"><div style="font-weight:600">Folders left out of attachments</div>` +
     `<textarea id="zs-pref-folders" rows="7" spellcheck="false" style="width:100%;box-sizing:border-box;margin-top:8px;${MONO};background:transparent;color:inherit;${BOX};padding:6px" ` +
     `aria-label="Folders left out of attachments">${esc(values.folders.join("\n"))}</textarea>` +
@@ -138,6 +167,18 @@ export function openPreferences({ document, values, defaults, save, actions = {}
   if (startFill) startFill.addEventListener("click", () => { close(); actions.onFillStartMessage(); });
   const reminderFill = pop.querySelector("#zs-pref-reminder-fill");
   if (reminderFill) reminderFill.addEventListener("click", () => { close(); actions.onFillReminder(); });
+  // The templates: each field is saved as it is changed, and its button writes an example into the text box.
+  for (const name of TEMPLATE_NAMES) {
+    const box = pop.querySelector(`#zs-pref-tpl-${name}`);
+    if (!box) continue;
+    for (const type of ["keydown", "keyup", "keypress"]) box.addEventListener(type, (event) => event.stopPropagation());
+    box.addEventListener("change", () => {
+      templates[name] = box.value;
+      if (save.templates) save.templates({ ...templates });
+    });
+    const fill = pop.querySelector(`#zs-pref-tpl-${name}-fill`);
+    if (fill) fill.addEventListener("click", () => { close(); actions.onFillTemplate(name, box.value); });
+  }
   const siteTick = pop.querySelector("#zs-pref-site");
   if (siteTick) {
     siteTick.checked = useSite;
@@ -182,5 +223,13 @@ export function openPreferences({ document, values, defaults, save, actions = {}
       contextBox.value = defaultContextFiles.join("\n");
       save.contextFiles(defaultContextFiles);
     }
+    // The templates go back to the wording the extension ships with.
+    for (const name of TEMPLATE_NAMES) {
+      const box = pop.querySelector(`#zs-pref-tpl-${name}`);
+      if (!box) continue;
+      box.value = defaultTemplates[name] || "";
+      templates[name] = box.value;
+    }
+    if (save.templates) save.templates({ ...templates });
   });
 }

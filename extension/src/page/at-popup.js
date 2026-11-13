@@ -56,8 +56,8 @@ export function createAtPopup({ document, window, root, state, settings, provide
   async function openPrefs() {
     close(false);
     openPreferences({
-      document, values: { ...(await preferences.read()), site: calibration ? calibration.limits() : undefined }, defaults: { folders: preferences.defaultFolders(), contextFiles: preferences.defaultContextFiles() },
-      save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders, contextFiles: preferences.setContextFiles, asFile: preferences.setAsFile, startContext: preferences.setStartContext, startTree: preferences.setStartTree, site: calibration && calibration.setLimits },
+      document, values: { ...(await preferences.read()), site: calibration ? calibration.limits() : undefined }, defaults: { folders: preferences.defaultFolders(), contextFiles: preferences.defaultContextFiles(), templates: preferences.defaultTemplates() },
+      save: { chars: preferences.setChars, calls: preferences.setCalls, folders: preferences.setFolders, contextFiles: preferences.setContextFiles, asFile: preferences.setAsFile, startContext: preferences.setStartContext, startTree: preferences.setStartTree, templates: preferences.setTemplates, site: calibration && calibration.setLimits },
       actions: {
         onCalibrate: () => calibration && calibration.open(null),
         onCalibrateCaptcha: () => calibration && calibration.open("captcha"),
@@ -72,6 +72,7 @@ export function createAtPopup({ document, window, root, state, settings, provide
         onFillTest: calibration && calibration.fillTestText,
         onFillStartMessage: calibration && calibration.fillStartMessage,
         onFillReminder: calibration && calibration.fillReminderMessage,
+        onFillTemplate: calibration && calibration.fillTemplate,
         onAttachTest: calibration && calibration.attachTestFile,
       },
     });

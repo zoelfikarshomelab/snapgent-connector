@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Executes one command from the model and returns the text to send back.
-// It always returns a string: the model must ALWAYS receive an output.
+// It always returns an answer: the model must ALWAYS receive an output.
 //
 // Order of decisions (each delegated to a focused module):
 //   1. not while the tab is hidden             -> VisibilityPort
@@ -9,9 +9,14 @@
 //   4. call the bridge under guards            -> call-guard
 //      (a risky action first needs the user's approval -> ConfirmPort)
 //   5. shape the result for the model          -> domain/tools/result-feedback
+//
+// What the model reads is written from the user's templates (domain/prompt/templates.js): the body of the
+// answer, the command it came from, and - when it failed - the call as it should be written.
 
 import { FEEDBACK } from "../domain/prompt/feedback.js";
 import { JOB_ARGUMENT, JOB_OP_ARGUMENT, MODE_ARGUMENT, RESERVED_ARGUMENT, ROOT_ARGUMENT, declinedFeedback, needsApproval, unavailableFeedback, withoutReserved } from "../domain/tools/confirmation.js";
+import { withBudget, withExcluded } from "../domain/tools/call-arguments.js";
+import { commandMessage } from "../domain/tools/command-message.js";
 import { isolationError } from "../domain/tools/isolation.js";
 import { toFeedback } from "../domain/tools/result-feedback.js";
 import { runningDetail } from "../domain/tools/result-summary.js";
@@ -22,11 +27,7 @@ import { callWithGuards } from "./call-guard.js";
 import { waitOut } from "./wait-loop.js";
 
 const DEFAULT_TIMEOUT_MS = 120000;
-// The size parameters a tool may advertise (read_files, run_command / run_project_script / run_tests, get_command_output).
-const OUTPUT_LIMIT_ARGUMENTS = ["max_total_chars", "max_output_chars", "max_chars"];
-const STOPPED_BEFORE_RUN = "ERROR: the command was not run - stopped by the user.";
-// The commands that walk the folder and take `exclude`: the user's list of folders left out of attachments is added to what the model wrote.
-const EXCLUDING_COMMANDS = ["tree", "search_files", "find_files"];
+const STOPPED_BEFORE_RUN = "the command was not run: you stopped it before it started.";
 
 export class ToolRunner {
   /**
@@ -39,11 +40,12 @@ export class ToolRunner {
    *           approvalMode?: () => string,
    *           workspaceRoot?: () => (string|null),   // the folder this chat works in, sent with every VS Code command
    *           excludedFolders?: () => string[],      // the folders the user left out of attachments, added to tree / search_files / find_files
+   *           templates?: () => { result: string, error: string },   // the user's wording for a command that worked and one that failed
    *           timers?: import("./ports.js").Timers,
    *           timeoutMs?: number,
    *           now?: () => number }} deps
    */
-  constructor({ bridge, catalogue, session, visibility, sink, confirm = null, approvalMode = () => "manual", workspaceRoot = () => null, excludedFolders = () => [], timers = globalThis, timeoutMs = DEFAULT_TIMEOUT_MS, now = Date.now }) {
+  constructor({ bridge, catalogue, session, visibility, sink, confirm = null, approvalMode = () => "manual", workspaceRoot = () => null, excludedFolders = () => [], templates = () => ({}), timers = globalThis, timeoutMs = DEFAULT_TIMEOUT_MS, now = Date.now }) {
     this._bridge = bridge;
     this._catalogue = catalogue;
     this._session = session;
@@ -53,6 +55,7 @@ export class ToolRunner {
     this._approvalMode = approvalMode;
     this._workspaceRoot = workspaceRoot;
     this._excludedFolders = excludedFolders;
+    this._templates = templates;
     this._timers = timers;
     this._timeoutMs = timeoutMs;
     this._now = now;
@@ -62,64 +65,42 @@ export class ToolRunner {
    * @param {{ tool: string, arguments?: object }} call
    * @param {{ budgetChars?: number, jobKey?: string }} [options]  the most output the model may be sent for this call;
    *   the name the VS Code server knows the call by (the same call again is answered, not run twice; Stop cancels it)
+   * @returns {Promise<{ text: string, body: string, isError: boolean, images?: object[], event?: string }>}
+   *   `text` is what the model reads, `body` is the raw output (what the terminal panel and the extension itself read).
    */
   async run(call, { budgetChars, jobKey } = {}) {
     const name = call.tool;
     const args = call.arguments || {};
-    if (!name) return FEEDBACK.parseError("malformed");
+    if (!name) return this._answer(call, { body: FEEDBACK.parseError("malformed"), isError: true });
 
     // This is the single choke point for ALL execution, so it is also where we
     // refuse to run blind while the tab is in the background.
     if (this._visibility.isHidden() && !this._session.isStopped()) {
       this._sink.diag("tool.waitVisible", { name });
-      if (!(await this._visibility.waitUntilVisible()) || this._session.isStopped()) return STOPPED_BEFORE_RUN;
+      if (!(await this._visibility.waitUntilVisible()) || this._session.isStopped()) return this._answer(call, { body: STOPPED_BEFORE_RUN, isError: true });
     }
 
     const target = this._session.target();
-    if (name === LIST_SERVERS) return this._listServers(target);
-    if (isListCommands(name)) return this._listCommands(name, target, args);
+    if (name === LIST_SERVERS) return this._answer(call, await this._listServers(target));
+    if (isListCommands(name)) return this._answer(call, await this._listCommands(name, target, args));
 
     const refusal = isolationError({ name, target, targetEnabled: this._session.isEnabled(target) });
-    if (refusal) return refusal;
+    if (refusal) return this._answer(call, { body: refusal, isError: true });
     if (!this._catalogue.names().size) await this._catalogue.ensure();
     const workspaceTarget = target === DEFAULT_SERVER_ID || this._catalogue.active().some((tool) => ["tree", "list_dir", "list_commands"].includes(bareToolName(tool.name)));
-    if (workspaceTarget && !this._catalogue.names().size) return FEEDBACK.workspaceClosed(this._workspaceRoot());
-    if (!this._catalogue.knows(name)) return FEEDBACK.unknownTool(name, [...this._catalogue.names()]);
+    if (workspaceTarget && !this._catalogue.names().size) return this._answer(call, { body: FEEDBACK.workspaceClosed(this._workspaceRoot()), isError: true });
+    if (!this._catalogue.knows(name)) return this._answer(call, { body: FEEDBACK.unknownTool(name, [...this._catalogue.names()]), isError: true });
 
-    return this._execute(name, this._withBudget(name, this._withExcluded(name, withoutReserved(args)), budgetChars), target, jobKey);
+    return this._execute(call, name, withBudget(this._catalogue.all, name, withExcluded(name, withoutReserved(args), this._excludedFolders), budgetChars), target, jobKey);
   }
 
   /**
-   * The folders the user left out of attachments are left out of what the model lists and searches too: they are added to its own `exclude`.
-   * A find_files call with `exclude_only` is the file list of the `@` menu, which sends that list itself and wants nothing else added.
+   * The message the model reads, written from the user's templates: the command that ran, its output, and - when it failed -
+   * the call as it should be written.
    */
-  _withExcluded(name, args) {
-    if (!EXCLUDING_COMMANDS.includes(bareToolName(name)) || args.exclude_only === true) return args;
-    let own = [];
-    try { own = this._excludedFolders() || []; } catch { /* a broken preference must never stop a command */ }
-    const folders = Array.isArray(own) ? own.filter((item) => typeof item === "string" && item.trim()) : [];
-    if (!folders.length) return args;
-    const asked = Array.isArray(args.exclude) ? args.exclude.filter((item) => typeof item === "string") : [];
-    return { ...args, exclude: [...new Set([...asked, ...folders])] };
-  }
-
-  /**
-   * Hand the call's share of the message to the tool, when the tool can limit its own output (it then reads or keeps
-   * only what fits, and says what it left out). A smaller limit the model chose itself is kept.
-   */
-  _withBudget(name, args, budgetChars) {
-    if (!Number.isFinite(budgetChars) || budgetChars <= 0) return args;
-    const advertised = this._catalogue.all.find((tool) => bareToolName(tool.name) === bareToolName(name));
-    const properties = (advertised && advertised.inputSchema && advertised.inputSchema.properties) || {};
-    const limited = { ...args };
-    for (const key of OUTPUT_LIMIT_ARGUMENTS) {
-      if (!(key in properties)) continue;
-      const ceiling = Number(properties[key] && properties[key].maximum); // a size the tool would refuse is lowered to its largest
-      const room = Number.isFinite(ceiling) && ceiling > 0 ? Math.min(budgetChars, ceiling) : budgetChars;
-      const own = Number(limited[key]);
-      limited[key] = Number.isFinite(own) && own > 0 ? Math.min(own, room) : room;
-    }
-    return limited;
+  _answer(call, outcome) {
+    const text = commandMessage(call, outcome, this._templates() || {});
+    return { text, body: outcome.body, isError: !!outcome.isError, images: outcome.images, event: outcome.event };
   }
 
   async _listServers(target) {
@@ -159,7 +140,9 @@ export class ToolRunner {
     return approved ? null : declinedFeedback(confirmation.description);
   }
 
-  /** The default server, or any server that advertises a folder tool (an editor's fork, a server reached over SSH): the ones that take a job key and can end a command. */
+  /**
+   * The default server, or any server that advertises a folder tool (an editor's fork, a server reached over SSH): the ones that take a job key and can end a command.
+   */
   _isWorkspaceTarget(target) {
     return target === DEFAULT_SERVER_ID || this._catalogue.active().some((tool) => ["tree", "list_dir", "list_commands"].includes(bareToolName(tool.name)));
   }
@@ -200,7 +183,7 @@ export class ToolRunner {
     );
   }
 
-  async _execute(name, args, target, jobKey) {
+  async _execute(call, name, args, target, jobKey) {
     this._terminalBegin(jobKey, name, args, target);
     let result;
     try {
@@ -209,13 +192,13 @@ export class ToolRunner {
       this._terminalEnd(jobKey, "failed");
       throw error;
     }
-    if (result && result.kind === "stopped") { this._terminalEnd(jobKey, "stopped"); this._cancelJob(name, target, jobKey); return "(stopped by user)"; }
+    if (result && result.kind === "stopped") { this._terminalEnd(jobKey, "stopped"); this._cancelJob(name, target, jobKey); return this._answer(call, { body: "the command was stopped: you ended the session while it was still running.", isError: true }); }
     if (needsApproval(result)) {
       const refusal = await this._askUser(result.confirmation);
-      if (refusal) { this._terminalEnd(jobKey, "failed", refusal); return refusal; }
+      if (refusal) { this._terminalEnd(jobKey, "failed", refusal); return this._answer(call, { body: refusal, isError: true }); }
       // Repeat the very same call, now carrying the one-time token only the extension was given.
       result = await this._callBridge(name, { ...args, [RESERVED_ARGUMENT]: result.confirmation.token }, target, jobKey);
-      if (result && result.kind === "stopped") { this._terminalEnd(jobKey, "stopped"); this._cancelJob(name, target, jobKey); return "(stopped by user)"; }
+      if (result && result.kind === "stopped") { this._terminalEnd(jobKey, "stopped"); this._cancelJob(name, target, jobKey); return this._answer(call, { body: "the command was stopped: you ended the session while it was still running.", isError: true }); }
     }
     const status = result && result.ok ? "success" : (result && result.kind === "cancelled" ? "stopped" : "failed");
 
@@ -232,8 +215,9 @@ export class ToolRunner {
       this._sink.staleExtension(result.error, name);
       this._sink.diag("bridge.staleExtension", { name, error: result.error });
     }
+    const answer = this._answer(call, feedback);
     // The tab keeps the very text the model is given, so Copy hands over what a manual reply would need.
-    this._terminalEnd(jobKey, status, feedback.text);
-    return feedback.text;
+    this._terminalEnd(jobKey, status, answer.text);
+    return answer;
   }
 }

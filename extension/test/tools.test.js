@@ -2,7 +2,7 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { formatToolForModel, formatCatalogue } from "../src/domain/tools/catalogue.js";
 import { argSummary, feedbackIsError, runningLabel } from "../src/domain/tools/result-summary.js";
-import { containsResult, resultHeader, startsWithResult, withoutResultHeader } from "../src/domain/tools/result-marker.js";
+import { containsResult, matchesShape, shapeOf, startsWithResult, withoutResultHeader } from "../src/domain/tools/result-marker.js";
 
 const readFile = {
   name: "read_file",
@@ -61,13 +61,14 @@ describe("result summary", () => {
 });
 
 describe("result marker", () => {
-  test("a result starts with the command's name behind a »", () => {
-    assert.equal(resultHeader("tree"), "» tree");
-    assert.equal(startsWithResult("» tree\nbody"), true);
-    assert.equal(startsWithResult("  » tree"), true);
+  test("a result of the default template is recognised", () => {
+    assert.equal(startsWithResult("I ran `tree .` for you. Here is what came back:\nbody"), true);
+    assert.equal(startsWithResult("  I ran `tree .` for you."), true);
+    assert.equal(containsResult("intro\nI ran `tree .` for you.\nbody"), true);
   });
 
   test("the older wording is still recognised", () => {
+    assert.equal(startsWithResult("» tree\nbody"), true);
     assert.equal(startsWithResult("Output of 'tree':\nbody"), true);
     assert.equal(containsResult("intro\nOutput of 'tree':\nbody"), true);
   });
@@ -81,6 +82,14 @@ describe("result marker", () => {
     assert.equal(containsResult("intro\n» read_files\nbody"), true);
     assert.equal(withoutResultHeader("» read_files\nbody"), "body");
     assert.equal(withoutResultHeader("Output of 'x':\nbody"), "body");
+    assert.equal(withoutResultHeader("I ran `tree .` for you.\nbody"), "body");
     assert.equal(withoutResultHeader("plain"), "plain");
+  });
+
+  test("a message of ours is recognised by its shape, whatever the wording", () => {
+    const sent = ["I ran `tree .` for you. Here is what came back:", "\n\nsnapgent-connector"];
+    assert.equal(matchesShape([shapeOf(sent.join(""))], sent.join("")), true);
+    assert.equal(matchesShape([shapeOf(sent.join(""))], "the model wrote this"), false);
+    assert.equal(matchesShape([], sent.join("")), false);
   });
 });

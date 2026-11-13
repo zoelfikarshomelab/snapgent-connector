@@ -4,6 +4,7 @@
 
 import { PartQueue, ServerDirectory } from "../application/index.js";
 import defaultCalibrations from "../../profiles/default-calibrations.json";
+import { buildResendRider } from "../domain/prompt/resend.js";
 import { createAccountImport } from "../page/account-import.js";
 import { createAccountScope } from "../page/account-scope.js";
 import { createAccountStorage } from "../page/account-storage.js";
@@ -74,7 +75,7 @@ const preferences = createPreferences({ storage, state, defaults: defaultPrefere
 const budget = createMessageBudget({ storage, hostname: location.hostname, provider, diag });
 // The SSH connect dialog and folder browser, made below with the bar's toast: the tools reach it only when a chat starts on a server.
 let ssh;
-const tools = createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner: notify, terminal, accountKey: accounts.id, calls: budget.calls, excludedFolders: preferences.excludedFolders, browseRemote: (server) => ssh.browse(server) });
+const tools = createTools({ send, provider, state, settings, serverDirectory, visibility, storage, diag, banner: notify, terminal, accountKey: accounts.id, calls: budget.calls, excludedFolders: preferences.excludedFolders, browseRemote: (server) => ssh.browse(server), templates: () => preferences.templates() });
 terminal.setCancel((jobKey, name) => tools.runner.cancelJob(jobKey, name));
 terminal.setRunner((call, options) => tools.manual.run(call, options));
 terminal.setTools(() => tools.catalogue.active());
@@ -86,7 +87,7 @@ let agentMode;
 let patientMode;
 let replay;
 ssh = createSsh({ document, send, settings, state, toast: (text) => bar.toast(text) });
-const calibration = createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast: (text) => bar.toast(text), previewStartMessage: () => session?.previewStartMessage?.(), previewReminderMessage: async () => { await tools.catalogue.ensure(); return tools.catalogue.active().length ? tools.reminderText() : null; } });
+const calibration = createCalibrationActions({ document, location, provider, state, storage, settings, preferences, toast: (text) => bar.toast(text), previewStartMessage: () => session?.previewStartMessage?.(), previewReminderMessage: async () => { await tools.catalogue.ensure(); return tools.catalogue.active().length ? tools.reminderText() : null; }, previewBrief: () => tools.brief() });
 bar = createBar({
   document, window, provider, state, settings, serverDirectory, tools, monitor: bridgeStatus.monitor, storage, preferences, send, calibration, terminal, ssh,
   files: { list: () => attachments.listFiles(), refresh: () => attachments.refresh(), insert: (paths) => attachments.insert(paths), canList: () => attachments.canList() },
@@ -100,7 +101,7 @@ bar = createBar({
 
 const chat = createChat({ document, provider, state, visibility, catalogue: tools.catalogue, diag, cover: bar.cover, banner: notify, progress: (text) => bar.coverLabel(text), budget });
 const { turnKey, executed, progress } = createTurns({ provider });
-const resend = createPromptResend({ provider, state, storage, systemPrompt: tools.systemPrompt, limit: budget.limit, chat, diag });
+const resend = createPromptResend({ provider, state, storage, rider: () => buildResendRider(preferences.templates().resend, tools.brief()), limit: budget.limit, chat, diag });
 const parts = new PartQueue();
 const loop = createLoop({ state, provider, tools, chat, bar, visibility, executed, budget, jobs: createBatchJobs({ storage, provider, turnKey }), progress, resend, parts, diag });
 session = createSession({ state, provider, tools, chat, bar, reminder: loop.reminder, limit: budget.limit, storage, settings, serverDirectory, preferences, diag });

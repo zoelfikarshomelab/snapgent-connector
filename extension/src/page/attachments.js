@@ -9,7 +9,6 @@ import { findTags, foldersOf, isFolder, isTextFile, tagText } from "../domain/pr
 import { MAX_RESULT_PARTS } from "../domain/prompt/budget.js";
 import { partMessages } from "../domain/prompt/parts.js";
 import { feedbackIsError } from "../domain/tools/result-summary.js";
-import { withoutResultHeader } from "../domain/tools/result-marker.js";
 import { bareToolName } from "../domain/tools/names.js";
 
 export const MAX_TAGGED = 20;        // tags in one message
@@ -30,10 +29,10 @@ export function createAttachments({ provider, state, tools, chat, bar, budget, p
     if (files && Date.now() - files.at < LIST_TTL_MS && files.at >= state.filesChangedAt) return { ok: true, paths: files.paths };
     const startedAt = Date.now();
     // The whole project (not the first 2000 files the model gets by default): every file must be taggable.
-    const feedback = await tools.runner.run({ tool: "find_files", arguments: { path: ".", max_results: MAX_LISTED, exclude: preferences.excludedFolders(), exclude_only: true } });
+    const answer = await tools.runner.run({ tool: "find_files", arguments: { path: ".", max_results: MAX_LISTED, exclude: preferences.excludedFolders(), exclude_only: true } });
     let paths = null;
-    try { paths = JSON.parse(withoutResultHeader(feedback)); } catch { /* an error text, not a list */ }
-    if (!Array.isArray(paths)) return { ok: false, error: feedbackIsError(feedback) ? withoutResultHeader(feedback).split("\n")[0] : "The file list could not be read." };
+    try { paths = JSON.parse(answer.body); } catch { /* an error text, not a list */ }
+    if (!Array.isArray(paths)) return { ok: false, error: answer.isError ? answer.body.split("\n")[0] : "The file list could not be read." };
     const only = paths.filter((path) => typeof path === "string");
     const folders = foldersOf(only);
     paths = [...only, ...folders].sort((a, b) => a.localeCompare(b));
@@ -83,9 +82,9 @@ export function createAttachments({ provider, state, tools, chat, bar, budget, p
       if (bodies.length && left < MIN_FILES_CHARS) { unread.push(...queue); break; }
       const group = queue.splice(0, FILES_PER_CALL);
       bar.coverLabel(`Running read_files · ${paths.length - queue.length - group.length + 1}-${paths.length - queue.length} of ${paths.length}`);
-      const feedback = await tools.runner.run({ tool: "read_files", arguments: { paths: group, relations: false } }, { budgetChars: Math.max(MIN_FILES_CHARS, left) });
-      if (feedbackIsError(feedback)) return { error: withoutResultHeader(feedback).split("\n").slice(0, 3).join(" ") };
-      const body = withoutResultHeader(feedback).replace(/\n?\.\.\. \[\d+ more files remaining:[\s\S]*\]\s*$/, "").trim();
+      const answer = await tools.runner.run({ tool: "read_files", arguments: { paths: group, relations: false } }, { budgetChars: Math.max(MIN_FILES_CHARS, left) });
+      if (answer.isError) return { error: answer.body.split("\n").slice(0, 3).join(" ") };
+      const body = answer.body.replace(/\n?\.\.\. \[\d+ more files remaining:[\s\S]*\]\s*$/, "").trim();
       const missing = group.filter((path) => !body.includes(`===== ${path} =====`));
       if (missing.length === group.length) { unread.push(...group, ...queue); break; } // no room even for one
       bodies.push(body);

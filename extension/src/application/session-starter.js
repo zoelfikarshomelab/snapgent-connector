@@ -5,7 +5,7 @@
 
 import { WORKSPACE_PROBE_TOOL, checkStartPreconditions, handshakeUnavailable, isWorkspaceServer, probeSucceeded, workspaceRequiredBanner } from "../domain/agent/session-start.js";
 import { cleanContext } from "../domain/prompt/context-file.js";
-import { withoutResultHeader } from "../domain/tools/result-marker.js";
+import { shapeOf } from "../domain/tools/result-marker.js";
 import { unreadableBanner } from "../domain/agent/turn-policy.js";
 import { bareToolName } from "../domain/tools/names.js";
 import { trimMiddle } from "../domain/prompt/budget.js";
@@ -28,7 +28,7 @@ export class SessionStarter {
     *   startPrefs?: () => Promise<{ tree?: boolean, instructions?: boolean, folders?: string[] }>, // what the start message carries (both on unless false), and the folders its tree leaves out
    *   startMessage: (parts: { commands: string, tree: string, context?: { name: string, text: string } | null }) => string,
    *   chat: { submit: (text: string) => Promise<*>, next: (base: *) => Promise<object> },
-   *   runner: { run: (call: object) => Promise<string> },
+   *   runner: { run: (call: object) => Promise<{ text: string, body: string, isError: boolean }> },
    *   initialContext?: { limit: () => number },        // when present, the project tree is part of the start message (within this message size)
    *   layout?: import("./ports.js").LayoutCheckPort,   // verifies the engine understands the page
    *   view: import("./ports.js").StartViewPort,
@@ -68,8 +68,8 @@ export class SessionStarter {
     const { runner, target, view, workspace } = this._d;
     await workspace.refresh();
     const listed = await runner.run({ tool: "list_commands", arguments: { server: target.id() } });
-    if (handshakeUnavailable(listed)) { view.banner("warn", `${target.name()} unavailable`, "Is the server online?"); return null; }
-    return this._d.startMessage({ commands: withoutResultHeader(listed), tree: this._treeBlock(), context: this._context });
+    if (handshakeUnavailable(listed.body)) { view.banner("warn", `${target.name()} unavailable`, "Is the server online?"); return null; }
+    return this._d.startMessage({ commands: listed.body, tree: this._treeBlock(), context: this._context });
   }
 
   /** Target usable, composer ready, skills loaded. Reports why (banner) and returns false when not. */
@@ -131,9 +131,9 @@ export class SessionStarter {
   }
 
   /** After sending, the message must show up as a user turn. If it does not, the engine does not fully understand the page: warn, log what it looks like, and carry on. */
-  async _checkSentMessageIsRecognised() {
+  async _checkSentMessageIsRecognised(message) {
     const { layout, view, page } = this._d;
-    if (!layout || (await layout.sentMessageVisible())) return;
+    if (!layout || (await layout.sentMessageVisible(message))) return;
     this._diag("layout.sentMissing", layout.describe());
     view.banner("warn", `${page.displayName()} page not fully recognised`, "Your message was sent but not detected as a user turn.");
   }
@@ -150,14 +150,14 @@ export class SessionStarter {
     const { chat, runner, view, target, workspace, isStopped } = this._d;
     await workspace.refresh();
     const listed = await runner.run({ tool: "list_commands", arguments: { server: target.id() } });
-    if (handshakeUnavailable(listed)) { view.banner("warn", `${target.name()} unavailable`, "Is the server online?"); return false; }
+    if (handshakeUnavailable(listed.body)) { view.banner("warn", `${target.name()} unavailable`, "Is the server online?"); return false; }
     if (!alive()) return false;
 
-    const message = this._d.startMessage({ commands: withoutResultHeader(listed), tree: this._treeBlock(), context: this._context });
+    const message = this._d.startMessage({ commands: listed.body, tree: this._treeBlock(), context: this._context });
     const base = await chat.submit(message);
     this._diag("start.sent", { chars: message.length, tree: this._tree.length });
     if (!alive()) return false;
-    await this._checkSentMessageIsRecognised();
+    await this._checkSentMessageIsRecognised(message);
 
     const reply = await chat.next(base);
     this._diag("start.reply", { kind: reply.kind, text: reply.kind === "text" ? String(reply.text || "").slice(0, 200) : undefined, alive: alive() });

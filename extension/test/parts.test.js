@@ -113,6 +113,6 @@ describe("BatchRunner: output that does not fit in one message", () => {
     h.deps.budget = { limit: () => 100000, calls: () => 1 };
     await new AgentLoop(h.deps).run("base-0");
     assert.equal(h.events("run").length, 1);
-    assert.match(h.state.submitted[0].text, /NOT RUN \(at most 1 commands per reply\): b, c/);
+    assert.match(h.state.submitted[0].text, /did not run \(at most 1 commands per reply\): b, c/);
   });
 });

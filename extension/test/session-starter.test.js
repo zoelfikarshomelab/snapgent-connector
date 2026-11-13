@@ -29,7 +29,7 @@ function setup(over = {}) {
       submit: async (text) => { log.push(`submit:${text.slice(0, 12)}`); return `base${log.length}`; },
       next: async () => { log.push("next"); const r = queue.shift(); if (!r) throw new Error("no scripted reply"); return typeof r === "function" ? r(state) : r; },
     },
-    runner: { run: async (call) => { log.push(`run:${call.tool}`); return state.handshakeFeedback ?? "» list_commands\nsnapgent commands (2):"; } },
+    runner: { run: async (call) => { log.push(`run:${call.tool}`); const body = state.handshakeFeedback ?? "snapgent commands (2):"; return { text: `I ran \`${call.tool}\` for you.`, body, isError: false }; } },
     view: {
       toast: (t) => log.push(`toast:${t}`),
       banner: (l, title, text) => log.push(["banner", title, text]),
@@ -55,7 +55,7 @@ describe("SessionStarter", () => {
   });
 
   test("the model is never asked to fetch anything: the command list is run here and goes into the message", async () => {
-    const t = setup({ state: { responses: [ready], handshakeFeedback: "» list_commands\nsnapgent commands (2):\n\nread_files" } });
+    const t = setup({ state: { responses: [ready], handshakeFeedback: "snapgent commands (2):\n\nread_files" } });
     const submitted = [];
     t.starter._d.chat.submit = async (text) => { submitted.push(text); return "base"; };
     await t.starter.start();
@@ -73,7 +73,7 @@ describe("SessionStarter", () => {
   });
 
   test("a list that says the target is offline stops the start with a banner and sends nothing", async () => {
-    const t = setup({ state: { handshakeFeedback: "» list_commands\nNo commands available - offline" } });
+    const t = setup({ state: { handshakeFeedback: "No commands available - offline" } });
     await t.starter.start();
     assert.deepEqual(banners(t.log)[0].slice(1), ["VS Code unavailable", "Is the server online?"]);
     assert.ok(!t.log.some((e) => String(e).startsWith("submit")));
@@ -376,7 +376,7 @@ describe("previewing the start message", () => {
     assert.ok(!t.log.some((e) => typeof e === "string" && e.startsWith("toast:Use an empty chat")));
   });
   test("preview with no commands available returns null and sends nothing", async () => {
-    const t = setup({ state: { handshakeFeedback: "» list_commands\nNo commands available - offline" } });
+    const t = setup({ state: { handshakeFeedback: "No commands available - offline" } });
     assert.equal(await t.starter.preview(), null);
     assert.ok(!t.log.some((e) => String(e).startsWith("submit")));
   });

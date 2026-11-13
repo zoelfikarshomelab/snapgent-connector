@@ -3,17 +3,17 @@
 // result. The result is never truncated to make room: the rider is dropped and the
 // flag stays raised, so it rides the next (smaller) result instead.
 
-import { RESEND_RESULTS_EVERY, buildResendRider, fitsBudget, isResendDue } from "../domain/prompt/resend.js";
+import { RESEND_RESULTS_EVERY, fitsBudget, isResendDue } from "../domain/prompt/resend.js";
 
 export class PromptResender {
   /**
    * @param {{ tally: import("./sys-tally.js").SysTally, everyUsers: number, everyResults?: number,
-   *           systemPrompt: () => string, domCounts: () => {users:number, results:number},
+   *           rider: () => string, domCounts: () => {users:number, results:number},
    *           charBudget?: () => number, now?: () => number, onResent?: (at: number) => void,
    *           diag?: (event: string, data?: object) => void }} deps
    */
-  constructor({ tally, everyUsers, everyResults, systemPrompt, domCounts, charBudget = () => Infinity, now = Date.now, onResent = () => {}, diag = () => {} }) {
-    Object.assign(this, { _tally: tally, _everyUsers: everyUsers, _everyResults: everyResults, _systemPrompt: systemPrompt, _domCounts: domCounts, _charBudget: charBudget, _now: now, _onResent: onResent, _diag: diag });
+  constructor({ tally, everyUsers, everyResults, rider, domCounts, charBudget = () => Infinity, now = Date.now, onResent = () => {}, diag = () => {} }) {
+    Object.assign(this, { _tally: tally, _everyUsers: everyUsers, _everyResults: everyResults, _rider: rider, _domCounts: domCounts, _charBudget: charBudget, _now: now, _onResent: onResent, _diag: diag });
   }
 
   /** Count a typed turn or an injected result toward the budget. */
@@ -46,12 +46,12 @@ export class PromptResender {
   }
 
   /** Room the re-statement will need on the next message, so results leave it free (0 when none is due). */
-  reserve() { return this.due() ? buildResendRider(this._systemPrompt()).length : 0; }
+  reserve() { return this.due() ? this._rider().length : 0; }
 
   /** Attach the prompt to `text` if one is due and it fits. */
   attach(text) {
     if (!this.due()) return text;
-    const rider = buildResendRider(this._systemPrompt());
+    const rider = this._rider();
     if (!fitsBudget(text.length, rider.length, this._charBudget())) {
       this._diag("sys.resendDeferred", { result: text.length, rider: rider.length, cap: this._charBudget() });
       return text;

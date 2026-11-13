@@ -2,6 +2,7 @@ import { describe, test } from "node:test";
 import assert from "node:assert/strict";
 import { SESSION_PHRASE } from "../src/domain/constants.js";
 import { buildResendRider, countSinceLastMarker, fitsBudget, isResendDue } from "../src/domain/prompt/resend.js";
+import { DEFAULT_TEMPLATES } from "../src/domain/prompt/templates.js";
 import { SysTally } from "../src/application/sys-tally.js";
 import { PromptResender } from "../src/application/prompt-resender.js";
 
@@ -19,8 +20,8 @@ describe("resend rules", () => {
     assert.equal(fitsBudget(1e9, 1e9), true);
   });
 
-  test("the rider carries the marker and the prompt, and tells the model not to reply", () => {
-    const rider = buildResendRider("PROMPT BODY");
+  test("the rider carries the brief, and tells the model not to reply", () => {
+    const rider = buildResendRider(DEFAULT_TEMPLATES.resend, "PROMPT BODY");
     assert.ok(rider.endsWith("PROMPT BODY") && rider.includes("do not acknowledge this note"));
   });
 
@@ -111,12 +112,12 @@ describe("SysTally", () => {
 });
 
 describe("PromptResender", () => {
-  function setup({ everyUsers = 6, dom = { users: 0, results: 0 }, cap } = {}) {
+  function setup({ everyUsers = 6, dom = { users: 0, results: 0 }, cap, rider = () => "SYS" } = {}) {
     const tally = new SysTally({ storage: memoryStorage(), conversationKey: () => "c", enabled: true });
     const diags = [];
     const sent = [];
     const resender = new PromptResender({
-      tally, everyUsers, systemPrompt: () => "SYS", domCounts: () => dom,
+      tally, everyUsers, rider, domCounts: () => dom,
       charBudget: cap === undefined ? undefined : () => cap, now: () => 42, onResent: (at) => sent.push(at), diag: (e, d) => diags.push([e, d]),
     });
     return { resender, tally, diags, sent };
@@ -131,14 +132,14 @@ describe("PromptResender", () => {
     const { resender, tally, sent, diags } = setup();
     for (let i = 0; i < 12; i++) resender.bump("results");
     const out = resender.attach("result");
-    assert.ok(out.startsWith("result") && out.includes("A reminder from me") && out.endsWith("SYS"));
+    assert.ok(out.startsWith("result") && out.endsWith("SYS"));
     assert.deepEqual(tally.counts(), { users: 0, results: 0 });
     assert.deepEqual(sent, [42]);
     assert.ok(diags.some(([e, d]) => e === "sys.resend" && d.via === "toolResult"));
   });
 
   test("a rider that does not fit is dropped, the result is never truncated, and it stays due", () => {
-    const { resender, tally, diags } = setup({ cap: 50 });
+    const { resender, tally, diags } = setup({ cap: 50, rider: () => `RIDER ${"x".repeat(60)}` });
     for (let i = 0; i < 12; i++) resender.bump("results");
     assert.equal(resender.attach("result"), "result");
     assert.equal(tally.counts().results, 12);
@@ -162,7 +163,7 @@ describe("PromptResender", () => {
 
   test("feature off (everyUsers 0): never due, bump does nothing", () => {
     const tally = new SysTally({ storage: memoryStorage(), conversationKey: () => "c", enabled: false });
-    const resender = new PromptResender({ tally, everyUsers: 0, systemPrompt: () => "S", domCounts: () => ({ users: 99, results: 99 }) });
+    const resender = new PromptResender({ tally, everyUsers: 0, rider: () => "S", domCounts: () => ({ users: 99, results: 99 }) });
     resender.bump("results");
     assert.equal(resender.due(), false);
   });

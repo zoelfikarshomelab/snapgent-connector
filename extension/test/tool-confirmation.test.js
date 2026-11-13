@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { ToolCatalogue } from "../src/application/tool-catalogue.js";
 import { ToolRunner } from "../src/application/tool-runner.js";
 import { RESERVED_ARGUMENT, declinedFeedback, needsApproval, unavailableFeedback, withoutReserved } from "../src/domain/tools/confirmation.js";
+import { DEFAULT_TEMPLATES } from "../src/domain/prompt/templates.js";
 import { fakeBridge, fakeSession, fakeSink, fakeTimers, fakeVisibility, flush, tool } from "./support/fakes.js";
 
 const REQUEST = { ok: false, kind: "confirmation_required", error: "CONFIRMATION_REQUIRED: Delete file: a.txt", confirmation: { token: "tok-1", description: "Delete file: a.txt", tool: "delete_file", risk: "destructive" } };
@@ -20,7 +21,7 @@ function setup({ answer = true, confirm = undefined, results } = {}) {
   const catalogue = new ToolCatalogue({ bridge, session, now: timers.now });
   const sink = fakeSink();
   const port = confirm === null ? null : confirm || { ask: async (request) => { asked.push(request); return answer; } };
-  const runner = new ToolRunner({ bridge, catalogue, session, visibility: fakeVisibility(), sink, confirm: port, timers });
+  const runner = new ToolRunner({ bridge, catalogue, session, visibility: fakeVisibility(), sink, confirm: port, timers, templates: () => DEFAULT_TEMPLATES });
   return { runner, calls, asked, sink, session, timers };
 }
 
@@ -46,8 +47,9 @@ describe("approval helpers", () => {
 describe("ToolRunner: asking the user", () => {
   test("approved: the call is repeated with the token and its result is returned", async () => {
     const t = setup({ results: [REQUEST, { ok: true, text: "Deleted a.txt" }] });
-    const text = await t.runner.run({ tool: "delete_file", arguments: { path: "a.txt" } });
-    assert.equal(text, "» delete_file\nDeleted a.txt");
+    const answer = await t.runner.run({ tool: "delete_file", arguments: { path: "a.txt" } });
+    assert.equal(answer.body, "Deleted a.txt");
+    assert.match(answer.text, /I ran `delete_file a\.txt` for you/);
     assert.deepEqual(t.asked, [{ description: "Delete file: a.txt", tool: "delete_file", risk: "destructive" }]);
     assert.equal(t.calls.length, 2);
     assert.equal(t.calls[0].arguments[RESERVED_ARGUMENT], undefined);
@@ -58,14 +60,15 @@ describe("ToolRunner: asking the user", () => {
 
   test("declined: nothing is repeated and the model is told not to retry", async () => {
     const t = setup({ answer: false, results: [REQUEST] });
-    const text = await t.runner.run({ tool: "delete_file", arguments: { path: "a.txt" } });
-    assert.equal(text, declinedFeedback("Delete file: a.txt"));
+    const answer = await t.runner.run({ tool: "delete_file", arguments: { path: "a.txt" } });
+    assert.match(answer.text, /declined[\s\S]*NOT run[\s\S]*Do NOT retry/);
+    assert.equal(answer.isError, true);
     assert.equal(t.calls.length, 1);
   });
 
   test("no way to ask: the action is not run", async () => {
     const t = setup({ confirm: null, results: [REQUEST] });
-    assert.equal(await t.runner.run({ tool: "delete_file", arguments: { path: "a.txt" } }), unavailableFeedback("Delete file: a.txt"));
+    assert.match((await t.runner.run({ tool: "delete_file", arguments: { path: "a.txt" } })).text, /cannot ask/);
     assert.equal(t.calls.length, 1);
   });
 
@@ -83,15 +86,16 @@ describe("ToolRunner: asking the user", () => {
 
   test("if the server asks again after approval, the model gets an error instead of a loop", async () => {
     const t = setup({ results: [REQUEST, REQUEST] });
-    const text = await t.runner.run({ tool: "delete_file", arguments: { path: "a.txt" } });
-    assert.match(text, /^ERROR calling 'delete_file'/);
+    const answer = await t.runner.run({ tool: "delete_file", arguments: { path: "a.txt" } });
+    assert.equal(answer.isError, true);
+    assert.match(answer.text, /did not work/);
     assert.equal(t.asked.length, 1);
     assert.equal(t.calls.length, 2);
   });
 
   test("Stop pressed while the first call is running skips the dialog", async () => {
     const t = setup({ results: [{ ok: false, kind: "stopped" }] });
-    assert.equal(await t.runner.run({ tool: "delete_file", arguments: { path: "a.txt" } }), "(stopped by user)");
+    assert.match((await t.runner.run({ tool: "delete_file", arguments: { path: "a.txt" } })).text, /stopped/);
     assert.deepEqual(t.asked, []);
   });
 
@@ -102,6 +106,6 @@ describe("ToolRunner: asking the user", () => {
     await flush();
     t.session.state.stopped = true;
     t.timers.advance(150);
-    assert.equal(await pending, "(stopped by user)");
+    assert.match((await pending).text, /stopped/);
   });
 });

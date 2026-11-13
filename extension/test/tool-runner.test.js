@@ -3,14 +3,17 @@ import assert from "node:assert/strict";
 import { ToolCatalogue } from "../src/application/tool-catalogue.js";
 import { ToolRunner } from "../src/application/tool-runner.js";
 import { FEEDBACK } from "../src/domain/prompt/feedback.js";
+import { DEFAULT_TEMPLATES } from "../src/domain/prompt/templates.js";
 import { fakeBridge, fakeSession, fakeSink, fakeTimers, fakeVisibility, flush, tool } from "./support/fakes.js";
+
+const templates = () => DEFAULT_TEMPLATES;
 
 function setupRoot(root, over = {}) {
   const timers = fakeTimers();
   const bridge = fakeBridge({ tools: over.tools ?? [tool("read_file", { path: { type: "string" } })] });
   const sess = fakeSession(over.session);
   const catalogue = new ToolCatalogue({ bridge, session: sess, now: timers.now });
-  const runner = new ToolRunner({ bridge, catalogue, session: sess, visibility: fakeVisibility(), sink: fakeSink(), timers, workspaceRoot: () => root });
+  const runner = new ToolRunner({ bridge, catalogue, session: sess, visibility: fakeVisibility(), sink: fakeSink(), timers, workspaceRoot: () => root, templates });
   return { runner, bridge };
 }
 
@@ -22,9 +25,9 @@ describe("ToolRunner: the folder the chat works in", () => {
   });
   test("with VS Code closed (no commands offered) the model is told to ask the user, not given an empty list", async () => {
     const { runner, bridge } = setupRoot("/work/portofolio", { tools: [] });
-    const text = await runner.run({ tool: "read_file", arguments: { path: "a" } });
-    assert.equal(text, FEEDBACK.workspaceClosed("/work/portofolio"));
-    assert.match(text, /open that folder in their editor/);
+    const answer = await runner.run({ tool: "read_file", arguments: { path: "a" } });
+    assert.match(answer.text, /open that folder in their editor/);
+    assert.equal(answer.isError, true);
     assert.equal(bridge.calls.length, 0);
   });
 });
@@ -35,7 +38,7 @@ describe("ToolRunner: folders left out of attachments", () => {
     const bridge = fakeBridge({ tools: [tool("tree"), tool("find_files"), tool("search_files"), tool("read_file", { path: { type: "string" } })] });
     const sess = fakeSession();
     const catalogue = new ToolCatalogue({ bridge, session: sess, now: timers.now });
-    const runner = new ToolRunner({ bridge, catalogue, session: sess, visibility: fakeVisibility(), sink: fakeSink(), timers, excludedFolders: () => folders });
+    const runner = new ToolRunner({ bridge, catalogue, session: sess, visibility: fakeVisibility(), sink: fakeSink(), timers, excludedFolders: () => folders, templates });
     return { runner, bridge };
   }
   test("a tree the model asks for carries the list", async () => {
@@ -70,15 +73,18 @@ function setup({ tools = [tool("read_file", { path: { type: "string" } }), tool(
   const catalogue = new ToolCatalogue({ bridge, session: sess, now: timers.now });
   const sink = fakeSink();
   const vis = fakeVisibility(visibility);
-  const runner = new ToolRunner({ bridge, catalogue, session: sess, visibility: vis, sink, timers });
+  const runner = new ToolRunner({ bridge, catalogue, session: sess, visibility: vis, sink, timers, templates });
   return { runner, bridge, session: sess, sink, vis, timers, catalogue };
 }
 
 describe("ToolRunner.run — real tools", () => {
-  test("a successful call returns 'Output of' and sends the right request to the selected server", async () => {
+  test("a successful call names the command and shows what it returned", async () => {
     const { runner, bridge } = setup({ results: { read_file: { ok: true, text: "file body" } } });
-    const text = await runner.run({ tool: "read_file", arguments: { path: "a.js" } });
-    assert.equal(text, "» read_file\nfile body");
+    const answer = await runner.run({ tool: "read_file", arguments: { path: "a.js" } });
+    assert.equal(answer.body, "file body");
+    assert.match(answer.text, /I ran `read_file a\.js` for you/);
+    assert.match(answer.text, /file body/);
+    assert.equal(answer.isError, false);
     assert.deepEqual(bridge.calls, [{ name: "read_file", arguments: { path: "a.js", __snapgent_mode: "manual" }, timeout: 120000, server: "snapgent" }]);
   });
 
@@ -90,37 +96,45 @@ describe("ToolRunner.run — real tools", () => {
 
   test("a call without a name is a malformed-command error", async () => {
     const { runner } = setup();
-    assert.equal(await runner.run({}), FEEDBACK.parseError("malformed"));
+    const answer = await runner.run({});
+    assert.equal(answer.isError, true);
+    assert.match(answer.text, /could not be read/);
   });
 
   test("an unknown tool lists the valid names and never reaches the bridge", async () => {
     const { runner, bridge } = setup();
-    const text = await runner.run({ tool: "rm_rf" });
-    assert.equal(text, FEEDBACK.unknownTool("rm_rf", ["read_file", "git_status"]));
+    const answer = await runner.run({ tool: "rm_rf" });
+    assert.match(answer.text, /there is no command called "rm_rf"/);
+    assert.match(answer.text, /read_file, git_status/);
     assert.equal(bridge.calls.length, 0);
   });
 
   test("a disabled server refuses to run anything", async () => {
     const { runner, bridge } = setup({ session: { enabled: new Set() } });
-    assert.match(await runner.run({ tool: "read_file" }), /disabled by the user/);
+    assert.match((await runner.run({ tool: "read_file" })).text, /disabled by the user/);
     assert.equal(bridge.calls.length, 0);
   });
 
   test("a prefix naming another server is refused", async () => {
     const { runner, bridge } = setup();
-    assert.match(await runner.run({ tool: "other/read_file" }), /Only the selected target "snapgent"/);
+    assert.match((await runner.run({ tool: "other/read_file" })).text, /Only the selected target "snapgent"/);
     assert.equal(bridge.calls.length, 0);
   });
 
   test("bridge errors become feedback for the model", async () => {
     const { runner } = setup({ results: { read_file: { ok: false, kind: "disconnected" }, git_status: { ok: false, error: "boom" } } });
-    assert.equal(await runner.run({ tool: "read_file" }), FEEDBACK.bridgeOffline);
-    assert.match(await runner.run({ tool: "git_status" }), /ERROR calling 'git_status': boom/);
+    assert.match((await runner.run({ tool: "read_file" })).text, /bridge is unreachable/);
+    const failed = await runner.run({ tool: "git_status" });
+    assert.equal(failed.isError, true);
+    assert.match(failed.text, /boom/);
+    assert.match(failed.text, /did not work/);
+    assert.ok(failed.text.includes('{"command":"git_status","params":{}}'), "the call that works is shown");
   });
 
   test("a stale extension notifies the sink and tells the model to reload", async () => {
     const { runner, sink } = setup({ results: { read_file: { ok: false, kind: "stale-extension", error: "context invalidated" } } });
-    assert.equal(await runner.run({ tool: "read_file" }), FEEDBACK.staleExtension);
+    const answer = await runner.run({ tool: "read_file" });
+    assert.match(answer.text, /RELOAD THIS PAGE/);
     assert.deepEqual(sink.log.stale, [{ error: "context invalidated", name: "read_file" }]);
   });
 });
@@ -130,13 +144,13 @@ describe("ToolRunner.run — images", () => {
 
   test("without vision the image is refused and not stashed", async () => {
     const { runner, sink } = setup({ results: { read_file: { ok: true, text: "x", images: [image] } } });
-    assert.match(await runner.run({ tool: "read_file" }), /cannot see images/);
+    assert.match((await runner.run({ tool: "read_file" })).text, /cannot see images/);
     assert.equal(sink.log.images.length, 0);
   });
 
   test("with vision the images go to the sink and the text mentions the attachment", async () => {
     const { runner, sink } = setup({ session: { vision: true }, results: { read_file: { ok: true, text: "shot", images: [image] } } });
-    assert.match(await runner.run({ tool: "read_file" }), /image is attached to THIS message/);
+    assert.match((await runner.run({ tool: "read_file" })).text, /image is attached to this message/);
     assert.deepEqual(sink.log.images, [{ images: [image], name: "read_file" }]);
   });
 });
@@ -144,22 +158,23 @@ describe("ToolRunner.run — images", () => {
 describe("ToolRunner.run — virtual commands", () => {
   test("list_commands renders the selected server's catalogue without calling a tool", async () => {
     const { runner, bridge } = setup();
-    const text = await runner.run({ tool: "list_commands" });
-    assert.match(text, /^» list_commands\nsnapgent commands \(2\):/);
-    assert.match(text, /read_file: read_file tool/);
+    const answer = await runner.run({ tool: "list_commands" });
+    assert.match(answer.body, /^snapgent commands \(2\):/);
+    assert.match(answer.body, /read_file: read_file tool/);
+    assert.match(answer.text, /I ran `list_commands` for you/);
     assert.equal(bridge.calls.length, 0);
   });
 
   test("asking for another server gets a generic refusal", async () => {
     const { runner } = setup();
-    assert.match(await runner.run({ tool: "list_commands", arguments: { server: "secret" } }), /server "secret" is not available/);
+    assert.match((await runner.run({ tool: "list_commands", arguments: { server: "secret" } })).text, /server "secret" is not available/);
   });
 
   test("list_mcp_servers reports only the selected, enabled server", async () => {
     const { runner } = setup({ session: { servers: [{ id: "snapgent", alive: true, tools: 2 }, { id: "other", alive: true, tools: 9 }] } });
-    const text = await runner.run({ tool: "list_mcp_servers" });
-    assert.match(text, /- snapgent: Snapgent MCP \(default target\) - 2 commands available/);
-    assert.doesNotMatch(text, /other/);
+    const answer = await runner.run({ tool: "list_mcp_servers" });
+    assert.match(answer.body, /- snapgent: Snapgent MCP \(default target\) - 2 commands available/);
+    assert.doesNotMatch(answer.body, /other/);
   });
 });
 
@@ -174,17 +189,17 @@ describe("ToolRunner.run — hidden tab and stop", () => {
 
   test("stopped while parked: the command is not run", async () => {
     const { runner, bridge } = setup({ visibility: { hidden: true, becomesVisible: false } });
-    assert.match(await runner.run({ tool: "git_status" }), /not run - stopped by the user/);
+    assert.match((await runner.run({ tool: "git_status" })).text, /not run: you stopped it/);
     assert.equal(bridge.calls.length, 0);
   });
 
-  test("Stop during a long call returns promptly with '(stopped by user)'", async () => {
+  test("Stop during a long call returns promptly, and says the command was stopped", async () => {
     const { runner, session, timers } = setup({ results: { git_status: () => new Promise(() => {}) } });
     const pending = runner.run({ tool: "git_status" });
     await flush();
     session.state.stopped = true;
     timers.advance(150);
-    assert.equal(await pending, "(stopped by user)");
+    assert.match((await pending).text, /stopped/);
   });
 });
 
@@ -204,7 +219,7 @@ describe("ToolRunner — the terminal panel follows the job", () => {
         finish: (key, status) => calls.push(["finish", { key, status }]),
       },
     };
-    const runner = new ToolRunner({ bridge, catalogue, session: sess, visibility: fakeVisibility(), sink, timers });
+    const runner = new ToolRunner({ bridge, catalogue, session: sess, visibility: fakeVisibility(), sink, timers, templates });
     return { runner, calls };
   }
 
@@ -223,9 +238,9 @@ describe("ToolRunner — the terminal panel follows the job", () => {
 
   test("a cancelled call settles the tab as stopped and reads as one", async () => {
     const { runner, calls } = setupTerminal({ results: { run_command: { ok: false, kind: "cancelled", error: "stopped by user" } } });
-    const text = await runner.run({ tool: "run_command", arguments: { command: "sleep", args: ["99"] } }, { jobKey: "k1" });
-    assert.match(text, /⏹/);
-    assert.match(text, /stopped by user/);
+    const answer = await runner.run({ tool: "run_command", arguments: { command: "sleep", args: ["99"] } }, { jobKey: "k1" });
+    assert.match(answer.text, /stopped before it finished/);
+    assert.match(answer.text, /stopped by user/);
     assert.deepEqual(calls[1], ["finish", { key: "k1", status: "stopped" }]);
   });
 });

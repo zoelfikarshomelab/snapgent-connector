@@ -5,6 +5,8 @@
 import { SessionStarter, SessionTracker, textShowsSession } from "../application/index.js";
 import { SESSION_PHRASE } from "../domain/constants.js";
 import { buildStartMessage } from "../domain/prompt/start-message.js";
+import { askLine } from "../domain/prompt/templates.js";
+import { shapeOf } from "../domain/tools/result-marker.js";
 import { DEFAULT_SERVER_ID } from "../domain/tools/default-server.js";
 import { waitFor } from "./visibility.js";
 
@@ -67,14 +69,27 @@ export function createSession({ state, provider, tools, chat, bar, reminder, lim
     callTool: (name, args, timeout) => tools.bridge.callTool({ name, arguments: tools.workspace.withRoot(args), timeout }),
     skills: tools.skills,
     workspace: tools.workspace,
-    startMessage: ({ commands, tree, context }) => buildStartMessage({ prompt: tools.systemPrompt(), commands, tree, context }),
+    startMessage: ({ commands, tree, context }) => buildStartMessage({
+      template: preferences.templates().start,
+      values: {
+        ...tools.promptValues(),
+        commands,
+        tree,
+        instructions: context ? context.text.trim() : "",
+        instructions_file: context ? context.name : "",
+        ask: askLine(),
+      },
+    }),
     chat: { ...chat.turns, submit: chat.turns.submitInline || chat.turns.submit }, // the start message is typed, never attached as a file
     runner: tools.runner,
     initialContext: { limit },
     view: { toast: bar.toast, banner: bar.banner },
     layout: {
       // Our message must show up as a user turn carrying its own words: that is how the session is recognised later.
-      sentMessageVisible: () => waitFor(() => provider.allItems().some((item) => provider.isUserItem(item) && provider.itemText(item).includes(SESSION_PHRASE)), 5000),
+      sentMessageVisible: (message) => waitFor(() => {
+        const wanted = shapeOf(message, 24);
+        return provider.allItems().some((item) => provider.isUserItem(item) && shapeOf(provider.itemText(item), 24).startsWith(wanted));
+      }, 5000),
       describe: chat.describeLayout,
     },
     isStopped: () => state.stop,
@@ -83,7 +98,7 @@ export function createSession({ state, provider, tools, chat, bar, reminder, lim
     diag,
   });
 
-  const markerInDom = () => provider.allItems().some((item) => textShowsSession(item.textContent || "", SESSION_PHRASE));
+  const markerInDom = () => provider.allItems().some((item) => textShowsSession(item.textContent || "", SESSION_PHRASE, state.injected));
 
   /** Reconcile the flags with the conversation now on screen. Called on every page change. */
   function sync() {

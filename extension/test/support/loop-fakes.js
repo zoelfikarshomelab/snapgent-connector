@@ -1,6 +1,10 @@
 // Scripted fakes for AgentLoop's ports.
 import { ToolReminder } from "../../src/application/tool-reminder.js";
+import { feedbackIsError } from "../../src/domain/tools/result-summary.js";
 import { fakeTimers } from "./fakes.js";
+
+// The runner answers with the message the model reads; a test may give a plain string.
+export const asAnswer = (value) => (typeof value === "string" ? { text: value, body: value, isError: feedbackIsError(value) } : value);
 
 export function createLoopHarness({ responses = [], runner, hidden = false, hasCatalogue = true, reminderEvery = 20, halted = false, resumeTruncated = false } = {}) {
   const log = [];            // ordered record of everything observable
@@ -47,7 +51,7 @@ export function createLoopHarness({ responses = [], runner, hidden = false, hasC
     state, log, timers,
     deps: {
       chat, view, lifecycle, visibility, tools, memory, outbox,
-      runner: { run: (call) => { log.push(["run", call.tool]); return runnerImpl.run(call, state); } },
+      runner: { run: (call) => { log.push(["run", call.tool]); return Promise.resolve(runnerImpl.run(call, state)).then(asAnswer); } },
       reminder: new ToolReminder({ every: reminderEvery }),
       activity: { signature: () => "same", isPaused: () => false },
       timers,

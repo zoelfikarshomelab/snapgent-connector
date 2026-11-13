@@ -4,6 +4,7 @@
 import { MessageSender, ResponseWatcher } from "../application/index.js";
 import { describeAnchor } from "../infrastructure/chat/index.js";
 import { SESSION_PHRASE } from "../domain/constants.js";
+import { shapeOf } from "../domain/tools/result-marker.js";
 import { createOutputFile } from "./output-file.js";
 import { sleep, waitFor } from "./visibility.js";
 
@@ -14,6 +15,9 @@ const PHASE_LABELS = {
   checking: "Reply looks finished · checking that it is complete…",
   reading: "Reading the commands in the reply…",
 };
+
+// How many of our own messages the page remembers (the newest ones are the ones that matter).
+const INJECTED_LIMIT = 40;
 
 /**
  * @param {{ document: Document, provider: object, state: object, visibility: object, catalogue: object, diag: Function,
@@ -87,18 +91,28 @@ export function createChat({ document, provider, state, visibility, catalogue, d
     diag,
   });
 
+  // The wording of the messages the extension sends is the user's (see domain/prompt/templates.js), so the page recognises its
+  // own turns by what it remembers sending, not by a fixed shape.
+  const remember = (text) => {
+    const shape = shapeOf(text);
+    if (!shape) return;
+    if (!Array.isArray(state.injected)) state.injected = [];
+    state.injected.push(shape);
+    if (state.injected.length > INJECTED_LIMIT) state.injected.shift();
+  };
+
   return {
     describeLayout,
     /** The loop's and the starter's view of the conversation. */
     turns: {
       next: (base) => watcher.wait(base),
-      submit: async (text) => sender.submit(await outputFile.prepare(text)),
+      submit: async (text) => { remember(text); return sender.submit(await outputFile.prepare(text)); },
       // The start message goes in as typed text, never as a file: a session is recognised later by its words on the page.
-      submitInline: (text) => sender.submit(text),
+      submitInline: (text) => { remember(text); return sender.submit(text); },
       isHalted: (item) => provider.turnHalted(item),
       resumeTruncated: async () => !!(provider.clickContinueBtn() && await waitFor(() => provider.isGenerating(), 2500)),
     },
     waitForResponse: (base) => watcher.wait(base),
-    submit: async (text) => sender.submit(await outputFile.prepare(text)),
+    submit: async (text) => { remember(text); return sender.submit(await outputFile.prepare(text)); },
   };
 }

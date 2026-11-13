@@ -1,13 +1,23 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The first message of a session. Everything the model would otherwise have to ask for one command at a time (which commands exist, what
-// the project looks like) is in it, so the model's whole part of the start is one short answer. Pure.
+// The first message of a session, and the standing instructions it carries. Everything the model would otherwise have to ask for
+// one command at a time (which commands exist, what the project looks like) is in it, so the model's whole part of the start is
+// one short answer. The wording is the user's (see domain/prompt/templates.js). Pure.
 
-/** @param {{ prompt: string, commands: string, tree?: string, context?: { name: string, text: string } | null }} parts */
-export function buildStartMessage({ prompt, commands, tree = "", context = null }) {
-  const parts = [prompt];
-  if (context) parts.push(`Project instructions from ${context.name}:\n\n${context.text.trim()}\n\n(Files this text mentions are not included here: read them with read_files when they matter.)`);
-  parts.push(`These are the commands you can use here:\n\n${commands.trim()}`);
-  if (tree.trim()) parts.push(`This is what the project looks like (folders such as node_modules and .git are left out):\n\n${tree.trim()}`);
-  parts.push('If that is all clear, just reply "understood" and wait. Do not run anything yet: I will tell you what I want to do.');
-  return parts.join("\n\n");
+import { renderTemplate } from "./templates.js";
+
+/**
+ * @param {{ template: string, values?: Record<string, string> }} parts
+ *   `values` carries everything the template may use: the facts (the project, the target) and the parts of a session (the command
+ *   list, the project tree, the instruction file). A part that is empty is left out of the message.
+ */
+export function buildStartMessage({ template, values = {} }) {
+  return renderTemplate(template, values);
+}
+
+/**
+ * The same template without the parts of a session (the command list, the tree, the instruction file and the closing question):
+ * what is repeated to a model that forgot how we work, in the middle of a long conversation.
+ */
+export function buildBrief({ template, values = {} }) {
+  return renderTemplate(template, { ...values, commands: "", tree: "", instructions: "", instructions_file: "", ask: "" });
 }
