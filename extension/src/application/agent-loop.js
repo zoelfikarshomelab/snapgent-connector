@@ -35,6 +35,8 @@ export class AgentLoop {
    *   reminder: import("./tool-reminder.js").ToolReminder,
    *   activity: { signature: () => string, isPaused: () => boolean },
    *   timers: import("./ports.js").Timers,
+   *   delay?: { perCommand: () => number, random: () => number },  // the pauses the user set, in seconds
+   *   random?: () => number,
    *   now?: () => number,
    *   displayName: () => string,
    *   diag?: (event: string, data?: object) => void,

@@ -59,6 +59,7 @@
  * @property {(item: object, call: object) => void} toolRunning
  * @property {() => void} toolFinished
  * @property {(text: string) => void} [progress]  which command is running now (empty: none), for the composer cover
+ * @property {(waiting: boolean) => void} [delay]  the agent is waiting out a pause between commands
  */
 
 /**

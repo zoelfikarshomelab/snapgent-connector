@@ -4,6 +4,7 @@ import { JSDOM } from "jsdom";
 import { DEFAULT_CONTEXT_FILES, clampContextFiles } from "../src/domain/prompt/context-file.js";
 import { DEFAULT_EXCLUDED_FOLDERS, clampExcludedFolders, parseFolderNames } from "../src/domain/prompt/excluded-folders.js";
 import { DEFAULT_TEMPLATES, TEMPLATE_NAMES } from "../src/domain/prompt/templates.js";
+import { MAX_DELAY_SECONDS } from "../src/domain/tools/delay.js";
 import { createPreferences, KEYS } from "../src/page/preferences.js";
 import { openPreferences } from "../src/ui/preferences-popup.js";
 
@@ -85,8 +86,40 @@ describe("preferences", () => {
   test("read() gives what the panel shows", async () => {
     const preferences = createPreferences({ storage: fakeStorage({ [KEYS.chars]: 150000, [KEYS.calls]: 12 }), state: {} });
     const read = await preferences.read();
-    assert.deepEqual({ ...read, templates: undefined }, { chars: 150000, calls: 12, asFile: false, folders: DEFAULT_EXCLUDED_FOLDERS, contextFiles: DEFAULT_CONTEXT_FILES, startContext: true, startTree: true, templates: undefined });
+    assert.deepEqual({ ...read, templates: undefined }, { chars: 150000, calls: 12, asFile: false, folders: DEFAULT_EXCLUDED_FOLDERS, contextFiles: DEFAULT_CONTEXT_FILES, startContext: true, startTree: true, templates: undefined, delay: 0, randomDelay: 0 });
     assert.deepEqual(read.templates, DEFAULT_TEMPLATES, "the wording of the messages starts at the defaults");
+  });
+
+  test("the pauses: none until they are asked for, then saved, kept within what the panel allows, and read back", async () => {
+    const storage = fakeStorage();
+    const preferences = createPreferences({ storage, state: {} });
+    await flush();
+    assert.equal(preferences.delay(), 0);
+    assert.equal(preferences.randomDelay(), 0);
+    preferences.setDelay(7);
+    preferences.setRandomDelay(30);
+    assert.equal(storage.data[KEYS.delay], 7);
+    assert.equal(storage.data[KEYS.randomDelay], 30);
+    assert.equal(preferences.delay(), 7);
+    assert.equal(preferences.randomDelay(), 30);
+    const read = await preferences.read();
+    assert.deepEqual([read.delay, read.randomDelay], [7, 30]);
+    // A value the panel does not allow is brought back into it.
+    preferences.setDelay(99999);
+    assert.equal(preferences.delay(), MAX_DELAY_SECONDS);
+    preferences.setDelay("nonsense");
+    assert.equal(preferences.delay(), 0, "nothing usable means no pause");
+    preferences.setRandomDelay(-5);
+    assert.equal(preferences.randomDelay(), 0);
+  });
+
+  test("a pause changed in another tab is picked up", async () => {
+    const storage = fakeStorage();
+    const preferences = createPreferences({ storage, state: {} });
+    storage.set(KEYS.delay, 12);
+    assert.equal(preferences.delay(), 12);
+    storage.set(KEYS.randomDelay, 4);
+    assert.equal(preferences.randomDelay(), 4);
   });
 
   test("the templates are saved as the user writes them, and read back", async () => {
@@ -264,6 +297,32 @@ describe("preferences panel", () => {
     $("#zs-pref-reset").click();
     assert.equal($("#zs-pref-tpl-result").value, DEFAULT_TEMPLATES.result);
     assert.equal(saved[saved.length - 1].result, DEFAULT_TEMPLATES.result);
+  });
+
+  test("the pauses have a number field each, are saved as they are changed, and go back to none with the defaults", () => {
+    const w = new JSDOM("<!doctype html><body></body>").window;
+    const saved = [];
+    openPreferences({
+      document: w.document, values: { chars: 100000, calls: 8, folders: [], delay: 5, randomDelay: 20 },
+      defaults: { folders: [] },
+      save: { chars() {}, calls() {}, folders() {}, delay: (v) => saved.push(["delay", v]), randomDelay: (v) => saved.push(["random", v]) },
+    });
+    const $ = (selector) => w.document.querySelector(selector);
+    assert.equal($("#zs-pref-delay").type, "number", "a number field, not a slider");
+    assert.equal($("#zs-pref-delay").value, "5");
+    assert.equal($("#zs-pref-random-delay").value, "20");
+    $("#zs-pref-delay").value = "9";
+    $("#zs-pref-delay").dispatchEvent(new w.Event("change", { bubbles: true }));
+    assert.deepEqual(saved, [["delay", 9]]);
+    // A value the panel does not allow is brought back into it, in the field as well.
+    $("#zs-pref-random-delay").value = "99999";
+    $("#zs-pref-random-delay").dispatchEvent(new w.Event("change", { bubbles: true }));
+    assert.equal($("#zs-pref-random-delay").value, String(MAX_DELAY_SECONDS));
+    assert.deepEqual(saved[1], ["random", MAX_DELAY_SECONDS]);
+    $("#zs-pref-reset").click();
+    assert.equal($("#zs-pref-delay").value, "0");
+    assert.equal($("#zs-pref-random-delay").value, "0");
+    assert.deepEqual(saved.slice(2), [["delay", 0], ["random", 0]]);
   });
 
   test("calibration actions are offered and wired, and there is no section for the bar", () => {

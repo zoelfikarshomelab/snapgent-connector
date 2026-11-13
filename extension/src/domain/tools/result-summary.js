@@ -2,6 +2,7 @@
 // Did a command fail, and what to call it while it runs. Pure.
 
 import { withoutResultHeader } from "./result-marker.js";
+import { sleepLabel } from "./delay.js";
 
 const FULL_CHARS = 400;
 
@@ -29,10 +30,14 @@ export function runningDetail(call) {
   return clip(`${key}: ${Array.isArray(args[key]) ? args[key].join(", ") : String(args[key])}`);
 }
 
-/** What the composer cover says while a command runs: its place in a batch, its name, and what it is running. */
-export function runningLabel(call, step) {
+/**
+ * What the composer cover says while a command runs: its place in a batch, its name, what it is running and the pause that
+ * follows it (`sleep 10`). The pause is not part of the place in the batch: it is a wait, not a command.
+ */
+export function runningLabel(call, step, delay = 0) {
   const detail = runningDetail(call);
-  return `${step && step.total > 1 ? `${step.index + 1}/${step.total} · ` : ""}${call.tool}${detail ? ` · ${detail}` : ""}`;
+  const sleep = sleepLabel(delay);
+  return `${step && step.total > 1 ? `${step.index + 1}/${step.total} · ` : ""}${call.tool}${detail ? ` · ${detail}` : ""}${sleep ? ` · ${sleep}` : ""}`;
 }
 
 // A tool can report its own failure as a NORMAL result ("Error executing code: …"). Judged by the phrase that opens the

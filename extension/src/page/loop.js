@@ -5,10 +5,12 @@ import { AgentLoop, ToolReminder } from "../application/index.js";
 
 /**
  * @param {{ state: object, provider: object, tools: object, chat: object, bar: object, visibility: object, executed: object,
- *           budget: object, jobs: object, resend: object, parts: object, diag: Function }} deps
+ *           budget: object, jobs: object, resend: object, parts: object, preferences: object, diag: Function }} deps
  */
-export function createLoop({ state, provider, tools, chat, bar, visibility, executed, budget, jobs, progress, resend, parts, diag }) {
+export function createLoop({ state, provider, tools, chat, bar, visibility, executed, budget, jobs, progress, resend, parts, preferences, diag }) {
   const reminder = new ToolReminder();
+  // The pauses the user set (Preferences): no preferences, no pauses.
+  const delayValue = (name) => (preferences && typeof preferences[name] === "function" ? preferences[name]() : 0);
 
   const lifecycle = {
     start() {
@@ -48,6 +50,7 @@ export function createLoop({ state, provider, tools, chat, bar, visibility, exec
       if (item) item.dataset.zloop = "1"; // the loop owns this turn: the resume watchdog leaves it alone
     },
     toolFinished: () => { state.toolRunning = false; state.filesChangedAt = Date.now(); }, // a command may have made or removed files
+    delay: (waiting) => { state.delaying = waiting; }, // the agent is waiting out a pause: it is working, not stuck
   };
 
   const loop = new AgentLoop({
@@ -68,10 +71,12 @@ export function createLoop({ state, provider, tools, chat, bar, visibility, exec
     progress,
     parts,
     reminder,
+    // The pauses the user set: after every command, and a random one after the last of them.
+    delay: { perCommand: () => delayValue("delay"), random: () => delayValue("randomDelay") },
     // Nothing observable changing while the tab is visible and no tool runs means the loop is stuck.
     activity: {
       signature: () => [provider.assistantCount(), provider.userCount(), provider.streamLen(), provider.isGenerating() ? 1 : 0].join("|"),
-      isPaused: () => document.hidden || state.captcha || state.parked || state.toolRunning || state.injecting,
+      isPaused: () => document.hidden || state.captcha || state.parked || state.toolRunning || state.injecting || state.delaying,
     },
     timers: window,
     displayName: () => provider.displayName,

@@ -103,7 +103,7 @@ const chat = createChat({ document, provider, state, visibility, catalogue: tool
 const { turnKey, executed, progress } = createTurns({ provider });
 const resend = createPromptResend({ provider, state, storage, rider: () => buildResendRider(preferences.templates().resend, tools.brief()), limit: budget.limit, chat, diag });
 const parts = new PartQueue();
-const loop = createLoop({ state, provider, tools, chat, bar, visibility, executed, budget, jobs: createBatchJobs({ storage, provider, turnKey }), progress, resend, parts, diag });
+const loop = createLoop({ state, provider, tools, chat, bar, visibility, executed, budget, jobs: createBatchJobs({ storage, provider, turnKey }), progress, resend, parts, preferences, diag });
 session = createSession({ state, provider, tools, chat, bar, reminder: loop.reminder, limit: budget.limit, storage, settings, serverDirectory, preferences, diag });
 stop = createStop({ document, state, provider, bar, diag });
 agentMode = createAgentMode({ state, provider, storage, onStop: () => stop.stopLoop(), onChange: redraw, diag });

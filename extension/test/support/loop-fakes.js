@@ -6,7 +6,7 @@ import { fakeTimers } from "./fakes.js";
 // The runner answers with the message the model reads; a test may give a plain string.
 export const asAnswer = (value) => (typeof value === "string" ? { text: value, body: value, isError: feedbackIsError(value) } : value);
 
-export function createLoopHarness({ responses = [], runner, hidden = false, hasCatalogue = true, reminderEvery = 20, halted = false, resumeTruncated = false } = {}) {
+export function createLoopHarness({ responses = [], runner, hidden = false, hasCatalogue = true, reminderEvery = 20, halted = false, resumeTruncated = false, delay = null, random = null } = {}) {
   const log = [];            // ordered record of everything observable
   const queue = [...responses];
   const timers = fakeTimers();
@@ -53,6 +53,9 @@ export function createLoopHarness({ responses = [], runner, hidden = false, hasC
       chat, view, lifecycle, visibility, tools, memory, outbox,
       runner: { run: (call) => { log.push(["run", call.tool]); return Promise.resolve(runnerImpl.run(call, state)).then(asAnswer); } },
       reminder: new ToolReminder({ every: reminderEvery }),
+      // The pauses the user set: none unless a test asks for them.
+      delay: delay || { perCommand: () => 0, random: () => 0 },
+      random: random || (() => 0.5),
       activity: { signature: () => "same", isPaused: () => false },
       timers,
       now: timers.now,

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The preferences panel: message size, commands per reply, the wording of the messages the extension sends to the AI, the folders
-// left out of the attachable files, and the project instruction files the agent reads at a start. Each change is saved as it is
-// made. Opened from the menu behind the "switch AI" pill.
+// The preferences panel: message size, commands per reply, the pauses of the agent, the wording of the messages the extension
+// sends to the AI, the folders left out of the attachable files, and the project instruction files the agent reads at a start.
+// Each change is saved as it is made. Opened from the menu behind the "switch AI" pill.
 
 import { MAX_BATCH_CALLS, MAX_PROMPT_CHARS, MIN_BATCH_CALLS, MIN_PROMPT_CHARS } from "../domain/prompt/budget.js";
 import { DEFAULT_CONTEXT_FILES } from "../domain/prompt/context-file.js";
@@ -9,6 +9,8 @@ import { parseFolderNames } from "../domain/prompt/excluded-folders.js";
 import { DEFAULT_TEMPLATES, TEMPLATE_NAMES, placeholderList } from "../domain/prompt/templates.js";
 import { escapeHtml as esc, setHtml } from "./html.js";
 import { closeButton, mountPopup } from "./popup.js";
+import { bindSlider, slider } from "./preference-controls.js";
+import { bindDelays, delayFields, resetDelays } from "./preference-delays.js";
 
 const CHARS_STEP = 10000;
 const BOX = "border:1px solid rgba(128,128,128,.4);border-radius:6px";
@@ -16,11 +18,6 @@ const MONO = "font:11px ui-monospace,Consolas,monospace";
 
 const charsText = (chars) => `${Math.round(chars / 1000)}k chars (~${Math.round(chars / 4000)}k tokens)`;
 const callsText = (count) => `${count} command${count === 1 ? "" : "s"}`;
-
-const slider = (id, label, min, max, step, note) =>
-  `<div class="zs-pref"><div style="display:flex;justify-content:space-between;gap:8px;font-weight:600"><span>${label}</span><span id="${id}-value"></span></div>` +
-  `<input type="range" id="${id}" min="${min}" max="${max}" step="${step}" style="width:100%;box-sizing:border-box;margin:8px 0 2px" aria-label="${label}">` +
-  `<div class="zs-mcp-pop-note">${note}</div></div>`;
 
 // What each template is for, and what the user may put in it.
 const TEMPLATE_NOTES = {
@@ -102,7 +99,8 @@ export function openPreferences({ document, values, defaults, save, actions = {}
     slider("zs-pref-chars", "Message size", MIN_PROMPT_CHARS, MAX_PROMPT_CHARS, CHARS_STEP,
       "The most one message to the chat may hold. Longer output goes in the next messages (up to 5), the rest is cut in the middle. About 4 characters per token.") +
     slider("zs-pref-calls", "Commands per reply", MIN_BATCH_CALLS, MAX_BATCH_CALLS, 1,
-      "How many commands the AI may send in one reply. They run in order and are answered in one message; any beyond it are reported as not run.") + asFileBox + siteBox + startBoxes +
+      "How many commands the AI may send in one reply. They run in order and are answered in one message; any beyond it are reported as not run.") +
+    delayFields() + asFileBox + siteBox + startBoxes +
     (actions.onCopyTest
       ? slider("zs-pref-lorem", "Test text size", MIN_PROMPT_CHARS, MAX_PROMPT_CHARS, CHARS_STEP,
         "Copies this many characters of lorem ipsum to the clipboard, to paste into the chat and see how much one message it accepts. Fill the text box writes it the way the extension writes its own messages, which a site may treat differently from a paste of your own. Nothing is saved.") +
@@ -125,14 +123,7 @@ export function openPreferences({ document, values, defaults, save, actions = {}
     `<div class="zs-mcp-pop-foot"><button id="zs-pref-reset" class="zs-mcp-pop-btn zs-mcp-pop-btn-block">Restore the defaults</button></div></div>`);
   pop.querySelector(".zs-mcp-pop-close").addEventListener("click", close);
 
-  const bind = (id, value, show, store) => {
-    const input = pop.querySelector(`#${id}`);
-    const label = pop.querySelector(`#${id}-value`);
-    input.value = String(value);
-    label.textContent = show(value);
-    input.addEventListener("input", () => { label.textContent = show(Number(input.value)); });
-    input.addEventListener("change", () => store(Number(input.value)));
-  };
+  const bind = (id, value, show, store) => bindSlider(pop, id, value, show, store);
   // With "Only for this site" ticked the sliders write to this AI's calibration, otherwise to the general preferences.
   const own = values.site || null;
   let useSite = !!own;
@@ -141,6 +132,8 @@ export function openPreferences({ document, values, defaults, save, actions = {}
   const both = () => ({ chars: sliderValue("zs-pref-chars"), calls: sliderValue("zs-pref-calls"), asFile: pop.querySelector("#zs-pref-asfile").checked });
   bind("zs-pref-chars", own && own.chars ? own.chars : values.chars, charsText, (value) => { if (useSite) save.site(both()); else { general.chars = value; save.chars(value); } });
   bind("zs-pref-calls", own && own.calls ? own.calls : values.calls, callsText, (value) => { if (useSite) save.site(both()); else { general.calls = value; save.calls(value); } });
+  // The pauses are general: every site waits the same.
+  bindDelays(pop, values, save);
   const asFileTick = pop.querySelector("#zs-pref-asfile");
   asFileTick.checked = own && typeof own.asFile === "boolean" ? own.asFile : !!values.asFile;
   asFileTick.addEventListener("change", () => {
@@ -216,6 +209,8 @@ export function openPreferences({ document, values, defaults, save, actions = {}
   pop.querySelector("#zs-pref-reset").addEventListener("click", () => {
     folders.value = defaults.folders.join("\n");
     save.folders(defaults.folders);
+    // The pauses go back to none.
+    resetDelays(pop, save);
     for (const id of ["zs-pref-start-context", "zs-pref-start-tree"]) pop.querySelector(`#${id}`).checked = true;
     if (save.startContext) save.startContext(true);
     if (save.startTree) save.startTree(true);

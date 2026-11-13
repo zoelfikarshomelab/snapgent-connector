@@ -5,8 +5,12 @@
 // output do, and a command that would only get a sliver is not run. What does not fit in one message goes in the next
 // ones (PartQueue; the model is told to acknowledge briefly meanwhile). Nothing after a failure, an image or a stop runs. Every command carries a job key (batch id + place + content), so when the page is reloaded mid-batch and the
 // reply is run again, commands that already ran are answered from the server's record instead of running twice.
+//
+// Between the commands the agent waits out the pause the user set (Preferences): the composer says how long is left, and
+// Stop ends the wait at once. After the last command of the reply it waits out a random pause before the results go back.
 
 import { runningLabel } from "../domain/tools/result-summary.js";
+import { clampDelaySeconds, delayLabel, randomDelaySeconds } from "../domain/tools/delay.js";
 import { jobKey } from "../domain/tools/job-key.js";
 import { DEFAULT_BATCH_CALLS, MAX_RESULT_PARTS, MIN_CALL_CHARS, callShare, composeBatch, sessionIsLarge, trimMiddle } from "../domain/prompt/budget.js";
 import { partMessages } from "../domain/prompt/parts.js";
@@ -91,7 +95,13 @@ export class BatchRunner {
       this._diag("batch.step", { name: call.tool, index, of: batch.length, chars: text.length, left: room - used });
 
       if (step.isErr && index < batch.length - 1) { skipRest("stopped after the error above", index + 1); break; }
+
+      // The pause the user set: it follows every command that ran, before the next one starts.
+      if (!reused && !(await this._pause(this._perCommandDelay()))) { this._end(item); return { halted: true }; }
     }
+
+    // The random pause after the commands of this reply, before the results go back to the AI.
+    if (batch.length && !(await this._pause(this._randomDelay()))) { this._end(item); return { halted: true }; }
 
     const ran = results.length;
     const said = ran === calls.length ? (ran === 1 ? "Command done" : `${ran}/${ran} commands done`) : `${ran} of ${calls.length} commands run`;
@@ -135,7 +145,9 @@ export class BatchRunner {
     // Park BEFORE marking the turn dispatched, so a long minimize neither shows a bogus running time nor loses the command on reload.
     if (!(await this._d.park("tool", { name: call.tool }))) return { halted: true };
 
-    if (view.progress) view.progress(`Running ${step && step.total > 1 ? "command " : ""}${runningLabel(call, step)}`);
+    // The pause that follows this command is named on the line, so the user sees it coming.
+    const pause = this._perCommandDelay();
+    if (view.progress) view.progress(`Running ${step && step.total > 1 ? "command " : ""}${runningLabel(call, step, pause)}`);
     view.toolRunning(item, call);
     memory.executed(item);
     this._diag("tool.start", { name: call.tool });
@@ -147,5 +159,46 @@ export class BatchRunner {
     const isErr = answer.isError;
     this._diag("tool.done", { name: call.tool, isErr, chars: feedback.length, firstLine: feedback.split("\n", 2).join(" | ").slice(0, 90) });
     return { feedback, isErr };
+  }
+
+  /** The pause after every command, in seconds (the user's own setting). */
+  _perCommandDelay() {
+    const delay = this._d.delay;
+    return delay && typeof delay.perCommand === "function" ? clampDelaySeconds(delay.perCommand()) : 0;
+  }
+
+  /** The random pause after the last command, in seconds: a whole number up to the most the user allowed. */
+  _randomDelay() {
+    const delay = this._d.delay;
+    if (!delay || typeof delay.random !== "function") return 0;
+    const random = typeof this._d.random === "function" ? this._d.random : Math.random;
+    return randomDelaySeconds(delay.random(), random);
+  }
+
+  /**
+   * Wait out a pause, saying how many seconds are left. False when the user stopped while waiting: the wait is over then,
+   * and so is the batch.
+   */
+  async _pause(seconds) {
+    const total = clampDelaySeconds(seconds);
+    if (!total) return true;
+    const { view, lifecycle } = this._d;
+    const clock = this._d.timers || globalThis;
+    let left = total;
+    if (view.delay) view.delay(true);
+    if (view.progress) view.progress(delayLabel(left));
+    try {
+      // One second at a time, so a Stop is honoured while the agent waits.
+      while (left > 0) {
+        if (lifecycle.isStopped()) return false;
+        await new Promise((resolve) => clock.setTimeout(resolve, 1000));
+        left -= 1;
+        if (left > 0 && view.progress) view.progress(delayLabel(left));
+      }
+    } finally {
+      if (view.delay) view.delay(false);
+    }
+    this._diag("batch.pause", { seconds: total });
+    return !lifecycle.isStopped();
   }
 }

@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The user's preferences that the preferences panel edits: how big one message may be, how many commands one reply may carry, which
-// folders are left out of the files that can be attached, and the wording of the messages the extension sends to the AI. All are
-// kept in the extension's storage, the same on every site; the message size and the command count are read by message-budget.js
-// from the same keys.
+// The user's preferences that the preferences panel edits: how big one message may be, how many commands one reply may carry, how
+// long the agent waits between commands, which folders are left out of the files that can be attached, and the wording of the
+// messages the extension sends to the AI. All are kept in the extension's storage, the same on every site; the message size and
+// the command count are read by message-budget.js from the same keys.
 
 import { DEFAULT_BATCH_CALLS, DEFAULT_EXCLUDED_FOLDERS, clampBatchCalls, clampExcludedFolders, clampPromptChars } from "../domain/index.js";
 import { clampContextFiles, DEFAULT_CONTEXT_FILES } from "../domain/prompt/context-file.js";
 import { clampTemplates, DEFAULT_TEMPLATES } from "../domain/prompt/templates.js";
+import { clampDelaySeconds, DEFAULT_DELAY_SECONDS } from "../domain/tools/delay.js";
 
-export const KEYS = { chars: "zsMaxPromptChars", calls: "zsMaxBatchCalls", folders: "zsExcludedFolders", contextFiles: "zsContextFiles", asFile: "zsOutputAsFile", startContext: "zsStartContext", startTree: "zsStartTree", templates: "zsTemplates" };
+export const KEYS = { chars: "zsMaxPromptChars", calls: "zsMaxBatchCalls", folders: "zsExcludedFolders", contextFiles: "zsContextFiles", asFile: "zsOutputAsFile", startContext: "zsStartContext", startTree: "zsStartTree", templates: "zsTemplates", delay: "zsCommandDelay", randomDelay: "zsRandomDelay" };
 
 /** @param {{ storage: object, state: object }} deps  `state.filesChangedAt` is bumped when the excluded folders change: the file list is then out of date */
 export function createPreferences({ storage, state, defaults }) {
@@ -41,6 +42,14 @@ export function createPreferences({ storage, state, defaults }) {
   storage.get(KEYS.templates).then((saved) => { templates = clampTemplates(saved); });
   storage.watch(KEYS.templates, (saved) => { templates = clampTemplates(saved); });
 
+  // How long the agent waits: after every command, and a random one after the last of them.
+  let delay = DEFAULT_DELAY_SECONDS;
+  let randomDelay = DEFAULT_DELAY_SECONDS;
+  storage.get(KEYS.delay).then((saved) => { delay = clampDelaySeconds(saved); });
+  storage.watch(KEYS.delay, (saved) => { delay = clampDelaySeconds(saved); });
+  storage.get(KEYS.randomDelay).then((saved) => { randomDelay = clampDelaySeconds(saved); });
+  storage.watch(KEYS.randomDelay, (saved) => { randomDelay = clampDelaySeconds(saved); });
+
   return {
     /** Whether a message over the size goes to the chat as a file (the general value; an AI's calibration may set its own). */
     asFile: () => asFile,
@@ -56,10 +65,16 @@ export function createPreferences({ storage, state, defaults }) {
     /** The wording of the messages the extension sends to the AI. */
     templates: () => templates,
     setTemplates(value) { templates = clampTemplates(value); storage.set(KEYS.templates, templates); },
+    /** The pause after every command, in seconds. */
+    delay: () => delay,
+    setDelay(value) { delay = clampDelaySeconds(value); storage.set(KEYS.delay, delay); },
+    /** The most the random pause after the last command of a reply may be, in seconds. */
+    randomDelay: () => randomDelay,
+    setRandomDelay(value) { randomDelay = clampDelaySeconds(value); storage.set(KEYS.randomDelay, randomDelay); },
     /** What the panel shows. */
     async read() {
-      const [chars, calls, saved, savedContext, savedAsFile, savedStartContext, savedStartTree, savedTemplates] = await Promise.all([storage.get(KEYS.chars), storage.get(KEYS.calls), storage.get(KEYS.folders), storage.get(KEYS.contextFiles), storage.get(KEYS.asFile), storage.get(KEYS.startContext), storage.get(KEYS.startTree), storage.get(KEYS.templates)]);
-      return { chars: clampPromptChars(chars), calls: clampBatchCalls(calls ?? DEFAULT_BATCH_CALLS), asFile: savedAsFile === true, folders: clampExcludedFolders(saved, defaultFolders), contextFiles: clampContextFiles(savedContext, defaultContextFiles), startContext: savedStartContext !== false, startTree: savedStartTree !== false, templates: clampTemplates(savedTemplates) };
+      const [chars, calls, saved, savedContext, savedAsFile, savedStartContext, savedStartTree, savedTemplates, savedDelay, savedRandomDelay] = await Promise.all([storage.get(KEYS.chars), storage.get(KEYS.calls), storage.get(KEYS.folders), storage.get(KEYS.contextFiles), storage.get(KEYS.asFile), storage.get(KEYS.startContext), storage.get(KEYS.startTree), storage.get(KEYS.templates), storage.get(KEYS.delay), storage.get(KEYS.randomDelay)]);
+      return { chars: clampPromptChars(chars), calls: clampBatchCalls(calls ?? DEFAULT_BATCH_CALLS), asFile: savedAsFile === true, folders: clampExcludedFolders(saved, defaultFolders), contextFiles: clampContextFiles(savedContext, defaultContextFiles), startContext: savedStartContext !== false, startTree: savedStartTree !== false, templates: clampTemplates(savedTemplates), delay: clampDelaySeconds(savedDelay), randomDelay: clampDelaySeconds(savedRandomDelay) };
     },
     setChars: (value) => storage.set(KEYS.chars, clampPromptChars(value)),
     setCalls: (value) => storage.set(KEYS.calls, clampBatchCalls(value)),

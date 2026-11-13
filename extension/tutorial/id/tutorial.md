@@ -84,6 +84,8 @@ Message size, secara default sudah di set 50K, artinya per prompt dibatas hanya 
 
 Commands per reply artinya per jawaban ai jika perlu menggunakan semua tools mcp batasnya adalah 20 tool json yang bisa di eksekusi.
 
+Delay per command: jeda setelah setiap command yang jalan, sebelum command berikutnya mulai. Random delay after the commands: jeda acak sampai detik tersebut setelah semua command dalam satu jawaban selesai, sebelum hasilnya dikembalikan ke AI. Keduanya mati secara default. Selama agent menunggu, text box menulis `delay 10` dan mundur ke bawah; selama command jalan tulisannya `Running command 1/3 · run_command · sleep 10` (jeda yang menyusul). Tombol Stop langsung membatalkan tunggunya.
+
 Output as file jika aktif maka ketika prompt yang dihasilkan mcp melebihi Message size akan dikirim sebagai file attach .txt. (provider yang bisa menerima file diantaranya ada Deepseek, ChatGPT - terlalu cepat terkena limit upload file, Claude, Meta AI, z.ai, Kimi, dan Grok)
 
 Only for this site jika aktif settingan akan disimpan untuk situs provider, jika tidak aktif maka akan menyimpan untuk semua situs.

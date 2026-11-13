@@ -22,6 +22,7 @@ export const createState = () => ({
   loopKey: null,
   injecting: false,
   toolRunning: false,
+  delaying: false, // the agent is waiting out a pause between commands (the user's own setting)
   parked: false, // waiting for the tab to come back to the foreground
   patient: false, // Patient mode: a reply is finished only after its text stayed unchanged for a while (kept per site by page/patient-mode.js)
   discuss: false, // Discussion mode: no reply is read and nothing runs (kept per conversation by page/agent-mode.js)
