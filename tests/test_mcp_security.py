@@ -1,6 +1,7 @@
 import unittest
 
 from snapgent_mcp import risk
+from snapgent_mcp.command_line import normalize_arguments
 from snapgent_mcp.security import (
     ALLOW, CONFIRM, DENY, MODES, READONLY, RESERVED_ARGUMENT, STANDARD, TRUSTED,
     ConfirmationStore, Policy, SessionState, decide, policy_from_env,
@@ -223,6 +224,13 @@ class DecisionMatrixTests(unittest.TestCase):
         self.assertEqual(self.verdict("run_command", risk.EXECUTE, wrapped, Policy(READONLY)), DENY)
         reason = decide(Policy(TRUSTED), "run_command", risk.EXECUTE, {"command": "sudo", "args": ["ls"]}, SessionState()).reason
         self.assertEqual(reason, "Run with elevated privileges (sudo or similar): sudo ls")
+
+    def test_a_privilege_command_written_in_one_piece_asks_too(self):
+        # The model writes "sudo rm -rf /" as one piece: the split happens before the policy looks, so it is still seen.
+        arguments = normalize_arguments("run_command", {"command": "sudo rm -rf /"})
+        for policy in (Policy(STANDARD), Policy(TRUSTED), Policy(TRUSTED, frozenset({"sudo"}))):
+            self.assertEqual(self.verdict("run_command", risk.EXECUTE, arguments, policy), CONFIRM, policy)
+        self.assertEqual(self.verdict("run_command", risk.EXECUTE, arguments, Policy(READONLY)), DENY)
 
     def test_trusted_mode_never_asks(self):
         p = Policy(TRUSTED)

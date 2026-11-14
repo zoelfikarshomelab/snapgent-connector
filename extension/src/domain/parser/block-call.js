@@ -67,6 +67,7 @@ export function scanBlocks(text, { complete = false } = {}) {
       const next = KEY_RE.exec(lines[at]);
       const deeper = indentOf(lines[at]) > indent;
       if (!next && !deeper) break; // a line that is neither a key nor part of a raw value ends the block
+      if (next && next[1] === "name") break; // another block starts here: a site that renders two code blocks one after the other leaves no line between them
       body.push(lines[at]);
       at++;
     }
@@ -150,6 +151,7 @@ export function parseBlockBody(body, { schemaOf, indent = 0 } = {}) {
     }
     const param = key[1];
     const rest = key[2].trim();
+    if (param === "name" && values.name) { index++; continue; } // the first name is the command's
     if (rest === "|" || rest === "|-" || rest === "|+") {
       const lines = [];
       index++;

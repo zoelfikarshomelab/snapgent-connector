@@ -4,6 +4,14 @@ All notable changes to snapgentV3 Free are documented here.
 
 ## [Unreleased]
 
+### Security
+- **A privilege command written in one piece is seen again.** The model writes a command the way a person types it, so `sudo rm -rf /` can arrive as one value instead of a program and its arguments. The check that looks for `sudo` and its friends read the whole value as the program's name, missed it, and in Auto the command ran without asking. A command line is now split once, before the policy looks at it: the program and the arguments are apart for the approval check, for the run, and for the log — so `sudo rm -rf /` asks for the user's approval, in every mode, as it always should.
+
+### Fixed
+- **Two commands written one after the other are two commands.** A site that renders a command block as a code block leaves the next one right behind it, with no line between them, and the two were read as one block: the second command's name and parameters replaced the first one's, so only one command ran. A `name:` line now always starts a new block.
+- **A command written in one piece now runs as it says.** `run_command` wanted the program and its arguments apart, so `{"command": "sleep 5"}` was run as a program called "sleep 5" and failed with *No such file or directory*. A command line that is not a program of its own is split into the program and its arguments (`npm test` → `npm test`), the arguments the model gave come after it, and a command that IS a program (it is on PATH, or it is a path) is left exactly as it is. The result is that the command the AI wrote is the command that runs — in the JSON shape and in the command block alike.
+- **The command a failure reports no longer says "undefined".** A command with no arguments was shown as `sleep 5 undefined`, which read as if the AI had written something wrong.
+
 ### Added
 - **A command can be written in the command block instead of JSON.** The shape of a command is now a **template of its own** in Preferences (*Command format*), with two ready-made shapes one click away: the JSON envelope the extension has always read, and the **command block** — a fenced block of `key: value` lines where nothing is escaped:
   ```

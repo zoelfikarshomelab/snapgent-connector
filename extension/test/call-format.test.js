@@ -217,6 +217,19 @@ describe("the command block a site leaves behind", () => {
     assert.deepEqual(parseToolCalls(prose, { schemaOf }), [{ tool: "my-service", arguments: { image: "nginx" } }], "without a catalogue to check against, any name counts");
   });
 
+  test("two code blocks one after the other, with no line between them, are two commands", () => {
+    // A site that renders two code blocks leaves no line between them: the second block must not be swallowed by the first.
+    const reply = ["name: run_command", "command: sleep 2", "name: run_command", "command: sleep 2", ""].join("\n");
+    const calls = parseToolCalls(reply, { schemaOf, knowsTool: () => true });
+    assert.equal(calls.length, 2);
+    assert.deepEqual(calls.map((call) => call.arguments.command), ["sleep 2", "sleep 2"]);
+  });
+
+  test("three code blocks with the site's own heading between them are three commands", () => {
+    const reply = ["Cuplikan kode", "name: run_command", "command: sleep 2", "Cuplikan kode", "name: run_command", "command: sleep 2", "Cuplikan kode", "name: run_command", "command: sleep 2", ""].join("\n");
+    assert.equal(parseToolCalls(reply, { schemaOf, knowsTool: () => true }).length, 3);
+  });
+
   test("a bare block with a raw value keeps it as it is", () => {
     // The text of a code block, as the page hands it over: the block ends the reply and the page ends it with a line break.
     const reply = ["name: edit_file", "path: src/a.js", "old_text: |", '    const x = "hello";', ""].join("\n");

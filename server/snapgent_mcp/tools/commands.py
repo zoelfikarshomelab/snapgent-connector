@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from ..background import RUNS, BackgroundRun, duration, wait_report
+from ..command_line import command_parts
 from ..context import Context
 from ..limits import (COMMAND_TIMEOUT_SECONDS, MAX_OUTPUT_CHARS, SAFE_PROJECT_SCRIPTS, SCRIPT_TIMEOUT_SECONDS,
                       WAIT_DEFAULT_SECONDS, WAIT_MAX_SECONDS)
@@ -67,10 +68,12 @@ def outside_root_argument(command: str, args: List[str], root: Path) -> Optional
 def run_command(ctx: Context, command: str, args: Optional[List[str]] = None, max_output_chars: Optional[int] = None) -> str:
     if not command.strip():
         raise ValueError("Command cannot be empty.")
-    stray = outside_root_argument(command, args or [], ctx.root)
+    # A command line written in one piece ("sleep 5") is split into the program and its arguments.
+    parts = command_parts(command, args)
+    stray = outside_root_argument(parts[0], parts[1:], ctx.root)
     if stray:
         raise ValueError(f"Refused: '{stray}' points outside the workspace root ({ctx.root}). Use a path inside the root, or choose another folder in the bar. This is a safety check, not a sandbox.")
-    return run_process_streaming(shell_wrap([command, *(args or [])]), ctx.root, timeout=COMMAND_TIMEOUT_SECONDS, detach=True,
+    return run_process_streaming(shell_wrap(parts), ctx.root, timeout=COMMAND_TIMEOUT_SECONDS, detach=True,
                                  max_output_chars=max_output_chars, on_chunk=ctx.stream)
 
 

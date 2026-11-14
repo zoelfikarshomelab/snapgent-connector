@@ -7,6 +7,7 @@ import threading
 from typing import Any, Callable, Dict, Optional, TextIO
 
 from . import SERVER_NAME, SERVER_VERSION, browse, protocol
+from .command_line import normalize_arguments
 from .context import Context
 from .jobs import CANCELLED_MESSAGE, JOB_ARGUMENT, JOB_OP_ARGUMENT, JobStore
 from .security import CONFIRM, DENY, MODE_ARGUMENT, RESERVED_ARGUMENT, ConfirmationStore, Policy, SessionState, decide, policy_for_call, policy_from_env
@@ -98,6 +99,9 @@ class McpServer:
         job_key = job_key if isinstance(job_key, str) and job_key else None
         job_op = arguments.pop(JOB_OP_ARGUMENT, None)
         bound_root = arguments.pop(ROOT_ARGUMENT, None)
+        # A command line the model wrote in one piece ("npm test") is split here, before the policy and the tool look at it:
+        # both have to see the same program and the same arguments.
+        arguments = normalize_arguments(name, arguments)
         try:
             if job_key and job_op == "cancel":
                 return protocol.result(request_id, protocol.tool_output(self._jobs.cancel(job_key)))

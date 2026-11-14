@@ -8,7 +8,7 @@ import { bareToolName } from "./names.js";
 // The parameters that read as plain words after the command name.
 const PLAIN = ["args", "path", "paths", "query", "pattern", "file_pattern", "script", "run_id"];
 
-const words = (value) => (Array.isArray(value) ? value.map((item) => String(item)) : [String(value)]);
+const words = (value) => (value === undefined || value === null ? [] : Array.isArray(value) ? value.map((item) => String(item)) : [String(value)]);
 
 /**
  * @param {string} name the command's name

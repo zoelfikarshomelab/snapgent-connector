@@ -93,6 +93,7 @@ test("the command a call stands for is written the way a person types it", () =>
   assert.equal(commandLine("tree", { args: "." }), "tree .");
   assert.equal(commandLine("tree", { path: "src" }), "tree src");
   assert.equal(commandLine("run_command", { command: "npm", args: ["test"] }), "npm test");
+  assert.equal(commandLine("run_command", { command: "sleep 5" }), "sleep 5", "no arguments, no nothing written after the command");
   assert.equal(commandLine("read_files", { paths: ["a.js", "b.js"] }), "read_files a.js b.js");
   assert.equal(commandLine("tree", { path: ".", max_depth: 2 }), "tree . max_depth=2");
   assert.equal(commandLine("list_commands"), "list_commands");
