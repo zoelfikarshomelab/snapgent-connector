@@ -27,10 +27,8 @@ const indentOf = (line) => INDENT_RE.exec(line)[0].length;
 /**
  * The blocks in the text: the fenced ones and the bare ones, each with the lines it holds.
  * @param {string} text
- * @param {{ complete?: boolean }} [options] `complete` says the text is whole (what the user pasted into the terminal), so a
- *   block that runs to the end of it is read and not taken for one that was cut off.
  */
-export function scanBlocks(text, { complete = false } = {}) {
+export function scanBlocks(text) {
   const lines = String(text || "").split("\n");
   const taken = new Array(lines.length).fill(false);
   const out = [];
@@ -71,10 +69,10 @@ export function scanBlocks(text, { complete = false } = {}) {
       body.push(lines[at]);
       at++;
     }
-    // A block that runs to the end of the reply was cut off: it is not read.
-    const closed = complete || at < lines.length;
+    // A bare block has no end of its own: the text of a code block is what the site rendered, and the last one ends where the
+    // reply ends. It is read, always: a reply that was cut off is cut off in the site, not here.
     for (let i = index; i < at; i++) taken[i] = true;
-    out.push({ start: index, body, closed, indent, fenced: false });
+    out.push({ start: index, body, closed: true, indent, fenced: false });
     index = at;
   }
   return out;
@@ -181,19 +179,19 @@ export function parseBlockBody(body, { schemaOf, indent = 0 } = {}) {
 
 /**
  * Every command the text holds, in the order they were written.
- * A block that was not closed is left out: the model is still writing it, and half a command must never run.
+ * A fenced block that was not closed is left out: the model is still writing it, and half a command must never run.
  * @param {string} text
- * @param {{ schemaOf?: (name: string) => object|null, knowsTool?: (name: string) => boolean, complete?: boolean }} [options]
- *   `knowsTool` keeps prose that merely starts with "name:" from being read as a command; `complete` says the text is whole.
+ * @param {{ schemaOf?: (name: string) => object|null, knowsTool?: (name: string) => boolean }} [options]
+ *   `knowsTool` keeps prose that merely starts with "name:" from being read as a command.
  * @returns {Array<{ tool: string, arguments: object, at: number }>}
  */
-export function parseBlockCalls(text, { schemaOf, knowsTool, complete = false } = {}) {
+export function parseBlockCalls(text, { schemaOf, knowsTool } = {}) {
   const lines = String(text || "").split("\n");
   const offsets = [];
   let at = 0;
   for (const line of lines) { offsets.push(at); at += line.length + 1; }
   const calls = [];
-  for (const block of scanBlocks(text, { complete })) {
+  for (const block of scanBlocks(text)) {
     if (!block.closed) continue;
     const call = parseBlockBody(block.body, { schemaOf, indent: block.indent });
     if (!call) continue;

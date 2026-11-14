@@ -202,13 +202,17 @@ describe("the command block a site leaves behind", () => {
     assert.deepEqual(result.result.calls, [{ tool: "run_command", arguments: { command: "sleep 5" } }]);
   });
 
-  test("a block that was cut off is not read, and the reply asks for a rewrite", () => {
-    const cut = "name: run_command\ncommand: sle";
-    assert.deepEqual(parseToolCalls(cut, { schemaOf }), []);
-    assert.equal(hasOpenToolBlock(cut), true, "it is still being written");
-    const result = classifyReply(cut, { item: {}, hasContinueButton: () => false, knowsTool: () => true, catalogueSize: 1, schemaOf });
-    assert.equal(result.result.kind, "parse_error");
-    assert.equal(result.result.reason, "unclosed");
+  test("the last block of a reply is read, even when the text ends with it", () => {
+    // The text of a reply is trimmed before it is read, so the last block ends where the reply ends: it is still a command.
+    const cut = "name: run_command\ncommand: sleep 2";
+    assert.deepEqual(parseToolCalls(cut, { schemaOf, knowsTool: () => true }), [{ tool: "run_command", arguments: { command: "sleep 2" } }]);
+    assert.equal(hasOpenToolBlock(cut), false, "and it does not look like a block that is still being written");
+  });
+
+  test("a fenced block that was not closed yet is not read", () => {
+    const half = "```command\nname: run_command\ncommand: sleep 2";
+    assert.deepEqual(parseToolCalls(half, { schemaOf, knowsTool: () => true }), []);
+    assert.equal(hasOpenToolBlock(half), true, "it is still being written");
   });
 
   test("prose that merely starts with name: is not a command", () => {

@@ -179,8 +179,8 @@ export function createTerminal({ document, diag, onChange = () => {}, copy = (te
   /** Text typed into the panel: the commands in it run one after the other, each under its own tab. */
   function submit(text) {
     if (!runner) return { ok: false, error: "Commands cannot be run from here yet." };
-    // The text is the user's own and whole: a command pasted from the chat runs as it is, in either shape.
-    const calls = parseToolCalls(text, { complete: true, schemaOf });
+    // The text is the user's own: a command pasted from the chat runs as it is, in either shape.
+    const calls = parseToolCalls(text, { schemaOf });
     if (!calls.length) return { ok: false, error: `No command found. Write it like ${sampleCall(format())}` };
     if (calls.length > MAX_MANUAL_CALLS) return { ok: false, error: `At most ${MAX_MANUAL_CALLS} commands at once.` };
     runManual(calls).catch((error) => diag("term.manualFailed", { error: String((error && error.message) || error) }));
