@@ -10,12 +10,11 @@ import { planTurn } from "../domain/agent/turn-policy.js";
 import { FEEDBACK } from "../domain/prompt/feedback.js";
 import { renderTemplate } from "../domain/prompt/templates.js";
 import { DEFAULT_PROMPT_CHARS } from "../domain/prompt/budget.js";
+import { shapeOf } from "../domain/tools/call-format.js";
 import { BatchRunner } from "./batch-runner.js";
 import { StallWatchdog } from "./stall-watchdog.js";
 
 const WATCHDOG_STALL_MESSAGE = ["Agent stopped waiting", "No progress for 3 min. Send continue to resume."];
-// The call the model should write, shown when its command could not be read at all.
-const CALL_EXAMPLE = '{"command": "name", "params": { ...your parameters... }}';
 
 export class AgentLoop {
   /**
@@ -76,6 +75,7 @@ export class AgentLoop {
           displayName: this._d.displayName(),
           truncCount,
           isHalted: () => this._d.chat.isHalted(res.item),
+          shape: this._shape(),
         });
         truncCount = plan.truncCount;
 
@@ -113,13 +113,26 @@ export class AgentLoop {
 
   // ── pieces ──────────────────────────────────────────────────────────────
 
+  /** The user's own wording for the messages the AI reads. */
+  _templates() {
+    const tools = this._d.tools;
+    const templates = tools && typeof tools.templates === "function" ? tools.templates() : null;
+    return templates && typeof templates === "object" ? templates : {};
+  }
+
+  /** How the shape of a command is called in the notes the model reads: the format the user set. */
+  _shape() {
+    return shapeOf(this._templates().format);
+  }
+
   /** A command that could not be read: the user's wording for a failure, with the reason and the call that works. */
   _failure(reason) {
-    const templates = this._d.tools && this._d.tools.templates ? this._d.tools.templates() : {};
+    const templates = this._templates();
     const template = templates.error;
     if (!template) return reason;
-    const text = renderTemplate(template, { command: "the command you wrote", name: "", error: reason, example: CALL_EXAMPLE });
-    return text.includes(CALL_EXAMPLE) ? text : `${text}\n\n${CALL_EXAMPLE}`;
+    const example = this._shape().example;
+    const text = renderTemplate(template, { command: "the command you wrote", name: "", error: reason, example });
+    return text.includes(example) ? text : `${text}\n\n${example}`;
   }
 
   /** Never read/parse/execute off-screen. Returns false only if the user stopped while parked. */

@@ -1,9 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Turns the assistant's reply text into runnable { tool, arguments } calls.
+//
+// Two shapes are read: the JSON envelope ({"command": ..., "params": {...}}) and the command block (a fenced block of
+// `key: value` lines, see block-call.js). Which one the model is taught is the user's own setting; both are read here, so a
+// model that writes the other shape is still understood.
 
 import { START_M, END_M } from "./markers.js";
 import { matchBrace, parseLoose, extractJson } from "./json-scan.js";
 import { parseNative } from "./native/index.js";
+import { parseBlockCalls } from "./block-call.js";
 
 // Normalise a parsed JSON object into { tool, arguments }, accepting both the
 // new snapgent schema ("command"/"params") and the function-calling
@@ -33,12 +38,23 @@ function extractToolsAnywhere(text) {
     if (end === -1) { pos = hit.index + 1; continue; }
     let call = null;
     try { call = normalizeCall(parseLoose(text.slice(start, end + 1))); } catch { /* not JSON: keep looking */ }
-    if (call) { out.push(call); pos = end + 1; } else pos = hit.index + 1;
+    if (call) { out.push({ ...call, at: start }); pos = end + 1; } else pos = hit.index + 1;
   }
   return out;
 }
 
-export function parseToolCalls(r) {
+/** The calls of both shapes, in the order they were written in the reply. */
+function extractEverywhere(text, options) {
+  const calls = [...extractToolsAnywhere(text), ...parseBlockCalls(text, options)];
+  return calls.sort((a, b) => a.at - b.at).map(({ tool, arguments: args }) => ({ tool, arguments: args }));
+}
+
+/**
+ * Every command the reply holds, in the order it wrote them.
+ * @param {string} r the reply
+ * @param {{ schemaOf?: (name: string) => object|null }} [options] `schemaOf` gives the parameter types of a command
+ */
+export function parseToolCalls(r, options = {}) {
   // Lowercase for case-insensitive end-marker search. Models write
   // ###end_mcp_tool### (underscore) or ###end-mcp_tool### (dash).
   const rLow = r.toLowerCase();
@@ -67,7 +83,7 @@ export function parseToolCalls(r) {
     from = em + END_M.length;
   }
   if (out.length === 0) {
-    out.push(...extractToolsAnywhere(r));
+    out.push(...extractEverywhere(r, options));
   }
   // Last, the model's own markup (DeepSeek's DSML): only when it wrote no command of ours.
   if (out.length === 0) out.push(...parseNative(r));

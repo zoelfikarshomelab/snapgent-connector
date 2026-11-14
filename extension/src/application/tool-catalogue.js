@@ -3,7 +3,7 @@
 // scoping to the selected server, and resolving names. One reason to change:
 // how the catalogue is cached and queried.
 
-import { isKnownName } from "../domain/tools/names.js";
+import { bareToolName, isKnownName } from "../domain/tools/names.js";
 import { serverOf } from "../domain/tools/virtual-commands.js";
 
 const DEFAULT_TTL_MS = 30000;
@@ -39,6 +39,16 @@ export class ToolCatalogue {
   names() { return new Set(this.active().map((tool) => tool.name)); }
 
   knows(name) { return isKnownName(this.names(), name); }
+
+  /**
+   * The parameter types of a command, as the server advertises them (null when the server does not know the name).
+   * A command written in the command block has no types of its own: the schema says what each parameter is.
+   */
+  schemaOf(name) {
+    const tool = this.active().find((item) => bareToolName(item.name) === bareToolName(name));
+    if (!tool || !tool.inputSchema) return null;
+    return tool.inputSchema.properties || null;
+  }
 
   /**
    * Refresh the catalogue, but never pay for it twice in a row: a dead MCP server

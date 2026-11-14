@@ -46,7 +46,8 @@ const BODY_ERR_RE =
   /^\s*(error executing|error:|erreur|exception|traceback|communication error|failed to|could ?not|cannot |unable to|fatal)\b/i;
 
 // The call the model should write: it is in every message about a failed command, and it is what tells a failure apart.
-const CALL_LINE = /^\s*\{"command":\s*"[^"]+"\s*,\s*"params"/;
+// Both shapes count: the JSON envelope and the command block.
+const CALL_LINE = /^\s*(?:\{"command":\s*"[^"]+"\s*,\s*"params"|```[ \t]*(?:command|snapgent))/;
 
 /** Our own wrapper (`ERROR …`), the call that shows a command failed, or a tool's in-body error lead-in. */
 export function feedbackIsError(feedback) {

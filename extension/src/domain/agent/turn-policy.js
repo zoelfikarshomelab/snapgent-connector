@@ -3,6 +3,7 @@
 // maps (response, state) -> plan, so every branch is testable without a browser.
 
 import { FEEDBACK } from "../prompt/feedback.js";
+import { JSON_SHAPE } from "../tools/call-format.js";
 
 export const MAX_TRUNCATED_RESUMES = 6;
 
@@ -24,10 +25,11 @@ const banner = (level, title, text) => ({ level, title, text });
  *   | { type: "skip" }} Plan
  *
  * @param {object} res  A response from the chat watcher (`kind` plus kind-specific fields).
- * @param {{ displayName: string, truncCount: number, isHalted: () => boolean, maxResumes?: number }} ctx
+ * @param {{ displayName: string, truncCount: number, isHalted: () => boolean, maxResumes?: number, shape?: object }} ctx
+ *   `shape` is how the shape of a command is called in the notes the model reads (the user's own format).
  * @returns {Plan & { truncCount: number }} the plan and the new consecutive-truncation count
  */
-export function planTurn(res, { displayName, truncCount, isHalted, maxResumes = MAX_TRUNCATED_RESUMES }) {
+export function planTurn(res, { displayName, truncCount, isHalted, maxResumes = MAX_TRUNCATED_RESUMES, shape = JSON_SHAPE }) {
   switch (res.kind) {
     case "context_limit":
       return { ...end({ banner: banner("limit", `${displayName} reached its context limit`, `${res.detail || ""} New chat.`) }), truncCount };
@@ -50,7 +52,7 @@ export function planTurn(res, { displayName, truncCount, isHalted, maxResumes = 
       return { ...end({ banner: banner("warn", "Reply kept getting cut off", "Too long. Try shorter.") }), truncCount };
 
     case "parse_error":
-      return { type: "parse-error", feedback: FEEDBACK.parseError(res.reason), truncCount: 0 };
+      return { type: "parse-error", feedback: FEEDBACK.parseError(res.reason, shape), truncCount: 0 };
 
     case "text":
       return { ...end(), truncCount: 0 }; // final answer

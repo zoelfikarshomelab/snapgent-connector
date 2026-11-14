@@ -6,6 +6,7 @@
 import {
   DSML_RE, START_M, hasOpenToolBlock, hasToolSignature, parseToolCalls, salvageCutOff, toolNameFromText,
 } from "../parser/index.js";
+import { hasBlock, blockName } from "../parser/block-call.js";
 
 // Argument keys that appear only in a tool's raw arguments, never in ordinary prose.
 const RAW_ARGUMENT_KEYS_RE = /"(?:edits|old_text|new_text)"\s*:/;
@@ -19,16 +20,17 @@ export const looksLikeCommand = (reply) =>
 
 /**
  * @param {string} reply  the settled reply text
- * @param {{ item: object, hasContinueButton: () => boolean, knowsTool: (name: string) => boolean, catalogueSize: number }} ctx
+ * @param {{ item: object, hasContinueButton: () => boolean, knowsTool: (name: string) => boolean, catalogueSize: number,
+ *           schemaOf?: (name: string) => object|null }} ctx
  * @returns {{ result: object, diags: Array<[string, object]> }}
  */
-export function classifyReply(reply, { item, hasContinueButton, knowsTool, catalogueSize }) {
+export function classifyReply(reply, { item, hasContinueButton, knowsTool, catalogueSize, schemaOf }) {
   const diags = [];
   const done = (result) => ({ result, diags });
   const parseError = (reason) => done({ kind: "parse_error", reason, raw: reply, item });
 
   if (hasToolSignature(reply)) {
-    const calls = parseToolCalls(reply);
+    const calls = parseToolCalls(reply, { schemaOf });
     if (calls.length) return done({ kind: "tool", calls, item });
     // A half-written command plus the site's Continue button means it was truncated: resume, don't report bad JSON.
     if (hasContinueButton()) return done({ kind: "truncated", text: reply, item });
@@ -49,6 +51,8 @@ export function classifyReply(reply, { item, hasContinueButton, knowsTool, catal
       }
       return parseError("unclosed");
     }
+    // A command block that names no command: the parameters are there, but which command they are for is not.
+    if (hasBlock(reply) && !blockName(reply)) return parseError("noName");
     // A closed-looking envelope that NAMES A REAL TOOL but failed to parse (an unescaped quote broke
     // the JSON). Gated on a known name so prose that merely quotes {"command": "..."} is not looped on.
     const name = toolNameFromText(reply);

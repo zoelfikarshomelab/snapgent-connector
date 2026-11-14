@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // The words the extension sends back to the model: why a command did not work, and the few notes that ride along with a result.
 // They are the reason inside the messages; the wording around them is the user's (see domain/prompt/templates.js). Pure data.
+//
+// The notes that show a command name the shape the model was taught (the `shape`): the JSON envelope or the command block. One
+// place decides, so the start message, the reminder and these notes never disagree.
 
 import { closestName } from "../tools/closest-name.js";
+import { JSON_SHAPE } from "../tools/call-format.js";
 
 // Feedback sent back to the model so it can self-correct.
 export const FEEDBACK = {
@@ -11,16 +15,19 @@ export const FEEDBACK = {
   // to tell the model exactly what to fix (a generic "bad JSON" was misleading
   // for the non-JSON cases). Falls back to the generic "malformed" text for any
   // unrecognised reason.
-  parseError: (reason) => {
+  parseError: (reason, shape = JSON_SHAPE) => {
     const notes = {
       malformed:
-        "the command in your reply could not be read: its JSON is not valid. " +
-        'Write it again as one plain JSON object, exactly like {"command": "name", "params": {...}}. ' +
+        "the command in your reply could not be read: it is not valid. " +
+        `Write it again as one ${shape.label}, exactly like ${shape.example}. ` +
         "You may add a short note around it.",
       unclosed:
         "the command in your reply was cut off before it finished, so it could not run. Write the WHOLE command " +
-        "again in one piece as one plain JSON object, exactly like " +
-        '{"command": "name", "params": {...}}.',
+        `again in one piece as one ${shape.label}, exactly like ${shape.example}.`,
+      // A command block that names no command: the parameters are there, but which command they are for is not.
+      noName:
+        "the command block in your reply names no command, so it was not read. The first line of the block is the " +
+        `command's name (\`name: exact_command_name\`), and its parameters go on the lines below it, like ${shape.example}.`,
       envelope:
         "you wrote a command's parameters as a bare JSON object, without the envelope around them, so it was not read as " +
         "a command. Wrap them like " +
@@ -42,16 +49,16 @@ export const FEEDBACK = {
       dsml:
         "you wrote that call in your own internal tool-call markup (the DSML invoke/parameter " +
         "tags), which I cannot read, so the command did not run. Never use those tags here. Write the call as one " +
-        'plain-text JSON object instead, exactly like {"command": "name", "params": { ...your parameters... }}.',
+        `plain-text ${shape.label} instead, exactly like ${shape.example}.`,
     };
     return notes[reason] || notes.malformed;
   },
   // Appended to the results of calls that were written in the model's own markup. Like `dsml` above it describes that markup and
   // never quotes it: a quoted marker in a user turn is echoed back by the model.
-  nativeFormat:
+  nativeFormat: (shape = JSON_SHAPE) =>
     "\n\n(A note from me: the commands above were written in your own internal tool-call markup. They were run this time, but do not " +
-    "use that markup or any internal tool of your own here. Call my commands instead, as one plain-text JSON " +
-    'object: {"command": "name", "params": { ...your parameters... }}.)',
+    "use that markup or any internal tool of your own here. Call my commands instead, as one plain-text " +
+    `${shape.label}: ${shape.example}.)`,
   // Appended to the result of a reply that held ONE command while more are allowed: the model drifts into one command per reply and
   // the user had to remind it every time. `max` is the effective Commands per reply.
   singleCommand: (max) =>
@@ -79,8 +86,8 @@ export const FEEDBACK = {
     "to check them, and do not retry the command, because every retry will fail the same way. " +
     "Tell the user in one short sentence to RELOAD THIS PAGE (F5), then stop and wait.",
   bridgeOffline:
-    "the local bridge is unreachable, so no command could run. " +
-    "This is an environment problem on the user's machine (the bridge is not " +
+    "the local bridge is unreachable, so no command could run. This is an " +
+    "environment problem on the user's machine (the bridge is not " +
     "running), NOT your mistake. Tell the user in " +
     "one short sentence that the bridge is offline, then stop " +
     "sending commands until they confirm it is back.",

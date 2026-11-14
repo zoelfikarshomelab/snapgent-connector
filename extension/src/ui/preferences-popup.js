@@ -11,6 +11,7 @@ import { escapeHtml as esc, setHtml } from "./html.js";
 import { closeButton, mountPopup } from "./popup.js";
 import { bindSlider, slider } from "./preference-controls.js";
 import { bindDelays, delayFields, resetDelays } from "./preference-delays.js";
+import { bindFormatButtons, formatButtons } from "./preference-formats.js";
 
 const CHARS_STEP = 10000;
 const BOX = "border:1px solid rgba(128,128,128,.4);border-radius:6px";
@@ -26,6 +27,7 @@ const TEMPLATE_NOTES = {
   result: ["A command that worked", "What the AI reads when a command ran fine: the command as it would be typed, and what it returned."],
   error: ["A command that failed", "What the AI reads when a command did not work: the command, what went wrong, and the call as it should be written."],
   resend: ["Reminder in a long chat", "The instructions again, sent to the AI in a long conversation when it starts to forget how we work. It rides along under a result."],
+  format: ["Command format", "How the AI writes a command: the shape it is taught, which the start message, the reminder and the example of a command that failed all repeat. Empty means the JSON shape. The extension reads both shapes whatever you write here."],
 };
 
 /**
@@ -78,7 +80,8 @@ export function openPreferences({ document, values, defaults, save, actions = {}
       `<div class="zs-mcp-pop-note">${note}</div>` +
       `<textarea id="zs-pref-tpl-${name}" rows="8" spellcheck="false" style="width:100%;box-sizing:border-box;margin-top:8px;${MONO};background:transparent;color:inherit;${BOX};padding:6px" ` +
       `aria-label="${title}">${esc(templates[name] || "")}</textarea>` +
-      `<div class="zs-mcp-pop-note">You may use ${placeholderList(name)}. A paragraph whose value is empty is left out of the message.</div>` +
+      (placeholderList(name) ? `<div class="zs-mcp-pop-note">You may use ${placeholderList(name)}. A paragraph whose value is empty is left out of the message.</div>` : "") +
+      (name === "format" ? formatButtons() : "") +
       fill + `</div>`;
   };
   const templateSection =
@@ -172,6 +175,8 @@ export function openPreferences({ document, values, defaults, save, actions = {}
     const fill = pop.querySelector(`#zs-pref-tpl-${name}-fill`);
     if (fill) fill.addEventListener("click", () => { close(); actions.onFillTemplate(name, box.value); });
   }
+  // The two ready-made command shapes, for the call-format box.
+  bindFormatButtons(pop);
   const siteTick = pop.querySelector("#zs-pref-site");
   if (siteTick) {
     siteTick.checked = useSite;

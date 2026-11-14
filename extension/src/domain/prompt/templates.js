@@ -7,16 +7,19 @@
 // paragraph whose value is empty, so an optional part (the project tree, the instruction file) simply does not appear when there
 // is nothing to show. Pure: a template in, text out.
 
+import { JSON_SPEC } from "../tools/call-format.js";
+
 /** The templates there are, in the order the preferences panel shows them. */
-export const TEMPLATE_NAMES = ["start", "reminder", "result", "error", "resend"];
+export const TEMPLATE_NAMES = ["start", "reminder", "result", "error", "resend", "format"];
 
 /** What each template may use. Anything else is left empty. */
 export const PLACEHOLDERS = {
-  start: ["project", "where", "target", "commands", "tree", "instructions", "instructions_file", "calls", "skills", "notes", "extra", "ask"],
-  reminder: ["target", "commands", "calls"],
+  start: ["project", "where", "target", "commands", "tree", "instructions", "instructions_file", "calls", "skills", "notes", "extra", "ask", "call_format"],
+  reminder: ["target", "commands", "calls", "call_format"],
   result: ["command", "name", "output"],
   error: ["command", "name", "error", "example"],
   resend: ["brief", "project", "target"],
+  format: [],
 };
 
 const ASK = 'If that is all clear, just reply "understood" and wait. Do not run anything yet: I will tell you what I want to do.';
@@ -48,23 +51,19 @@ A note about this chat site:
 Something more from me:
 {{extra}}
 
-Whenever you want something done, write the command as its own fenced JSON block in your reply:
-
-\`\`\`json
-{"command":"exact_command_name","params":{"key":"value"}}
-\`\`\`
+{{call_format}}
 
 It runs here in {{project}}, and what it returned comes back in my next message, each answer naming the command it came from. Use only the commands and parameters listed for you. If one you need is missing, or something is offline, say so plainly instead of claiming the task is done.
 
 A few habits that keep this quick and cheap:
-- You may write {{calls}} in one reply, each in its own fenced JSON block. They run in order and you get ONE message back with every result. Group commands that do not depend on each other (for example \`tree\` and a \`read_files\` of files you already know you need). If a command needs the result of an earlier one, wait for that result instead. A failing command stops the rest of the group.
+- You may write {{calls}} in one reply, each in its own block. They run in order and you get ONE message back with every result. Group commands that do not depend on each other (for example \`tree\` and a \`read_files\` of files you already know you need). If a command needs the result of an earlier one, wait for that result instead. A failing command stops the rest of the group.
 - Everything sent back to you shares one size limit. Output that is too long is cut in the middle (the start and the end are kept); files or commands that do not fit are listed as not read / not run, so ask for them in your next reply. Prefer a few targeted commands over reading everything.
 - A long command output reaches you as a preview: only its first and last lines, with a note in the middle that says how many lines were left out. That note has a run_id: use \`get_command_output\` with it to read the whole log, or only more of the end with a negative start_line (for example -200 when something failed), rather than running the command again.
 - When my message ends with "Attached files" and \`===== path =====\` blocks, those are files I tagged, with line numbers, as they are right now: use them directly and do not read them again unless you need more than is shown.
 - To explore, start from the project tree, then \`read_files\` with several related files in one call. Do not read files one at a time when a bulk read is possible. When read_files offers a relations option, its footer (the chain of files each one calls into, with their line ranges) comes by default: use it to find what to read next, then read just the pieces you need with ranges instead of whole files, and pass \`relations: false\` when you re-read something you already have the footer for.
 - Stay inside the folder and the files I ask about, and never make broad or destructive changes without asking me first.
 - If a command fails, use the error to adjust the next one, and never pretend it worked.
-- Write each command as a JSON block like the one above, not as a native function call.
+- Write each command in the block shown above, not as a native function call.
 - When you are done, sum up briefly what you did.
 
 {{ask}}`,
@@ -72,6 +71,8 @@ A few habits that keep this quick and cheap:
   reminder: `A quick reminder, not a new task and nothing to answer: these are the commands you can use ({{target}}), with their exact names and parameters.
 
 {{commands}}
+
+{{call_format}}
 
 You may write {{calls}} in one reply; they run in order and are answered in one message.`,
 
@@ -90,6 +91,10 @@ Here is how that command should be written, so that it runs:
   resend: `A note from me, not a new task: there is nothing to answer here. In a long chat this can get lost, so here is how we are working together once more. The commands do run on my machine, and what they return is what you have been getting from me. Just carry on with the task; do not acknowledge this note.
 
 {{brief}}`,
+
+  // The shape of a command: what the model is taught, and what every other message about a command repeats. Empty means the
+  // JSON envelope (the shape the extension has always read).
+  format: JSON_SPEC,
 };
 
 const PLACEHOLDER = /\{\{\s*([a-z_]+)\s*\}\}/g;
@@ -165,11 +170,13 @@ export function sampleValues(name) {
       instructions_file: "AGENTS.md",
       calls: "at most 5 commands",
       ask: ASK,
+      call_format: JSON_SPEC,
     },
     reminder: {
       target: "VS Code",
       commands: "read_files(paths) - Read files as bulk text\ntree(path) - Show a filtered tree of the workspace",
       calls: "at most 5 commands",
+      call_format: JSON_SPEC,
     },
     result: {
       command: "tree .",

@@ -31,6 +31,23 @@ describe("ResponseWatcher: finishing a reply", () => {
     assert.equal(res.kind, "tool");
     assert.ok(h.elapsed() >= 1000);
   });
+
+  test("a reply that holds a command block is a command too", async () => {
+    const block = "```command\nname: read_file\npath: a.js\n```";
+    const h = createWatchHarness({ initial: { gen: true, reply: block } }).at(200, { gen: false });
+    const res = await wait(h);
+    assert.equal(res.kind, "tool");
+    assert.deepEqual(res.calls, [{ tool: "read_file", arguments: { path: "a.js" } }]);
+  });
+
+  test("a command block that is still being written waits for its closing fence", async () => {
+    const h = createWatchHarness({ initial: { gen: false, reply: "```command\nname: read_file\npath: a" } })
+      .at(1000, { reply: "```command\nname: read_file\npath: a.js\n```" });
+    const res = await wait(h);
+    assert.equal(res.kind, "tool");
+    assert.equal(res.calls[0].tool, "read_file");
+    assert.ok(h.elapsed() >= 1000);
+  });
 });
 
 describe("ResponseWatcher: what it says it is doing", () => {

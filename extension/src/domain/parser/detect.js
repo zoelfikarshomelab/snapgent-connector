@@ -4,6 +4,7 @@
 import { START_M, CMD_KEY_RE } from "./markers.js";
 import { matchBrace } from "./json-scan.js";
 import { hasOpenNative, recognisesNative } from "./native/index.js";
+import { hasBlock, hasOpenBlock, blockName } from "./block-call.js";
 import { startsWithResult } from "../tools/result-marker.js";
 
 export function hasToolSignature(r) {
@@ -11,7 +12,8 @@ export function hasToolSignature(r) {
     r.includes(START_M) ||
     r.includes("MCP_TOOL") ||
     CMD_KEY_RE.test(r) ||
-    recognisesNative(r)
+    recognisesNative(r) ||
+    hasBlock(r)
   );
 }
 
@@ -21,6 +23,8 @@ export function hasToolSignature(r) {
 export function hasOpenToolBlock(r) {
   if (!r) return false;
   if (hasOpenNative(r)) return true;
+  // A command block that was opened and not closed yet: the model is still writing it.
+  if (hasOpenBlock(r)) return true;
   const sm = r.indexOf(START_M);
   if (sm !== -1) {
     const low = r.toLowerCase();
@@ -44,6 +48,9 @@ export function toolNameFromText(txt) {
   // or only whitespace (a site can render `"tool": "    "` for a beat) falls through to the placeholder below.
   const m = txt.match(/"(?:command|tool)"\s*:\s*"([^"]*)/);
   if (m && m[1].trim()) return m[1].trim();
+  // The command block names its command on the first line, so it can be named while it is being written.
+  const block = blockName(txt);
+  if (block) return block;
   return "command";
 }
 

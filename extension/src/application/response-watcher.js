@@ -34,7 +34,7 @@ export class ResponseWatcher {
    *   clock: { now: () => number, sleep: (ms: number) => Promise<void> },
    *   timings: { RESPONSE_TIMEOUT_MS: number, STABLE_MS: number, WARMUP_MS: number, REASON_NOREPLY_MS: number },
    *   knowsTool: (name: string) => boolean,
-   *   catalogueSize: () => number,
+   *   catalogueSize: () => number,   schemaOf?: (name: string) => object|null,   // the parameter types of a command
    *   describeLayout?: () => object,   // what the page looks like, logged when replies cannot be read
    *   diag?: (event: string, data?: object) => void,   patient?: () => boolean,   // patient mode: see patient-gate.js
    *   phase?: (name: "waiting"|"writing"|"checking"|"reading") => void,   // what the watcher is doing now
@@ -237,10 +237,8 @@ export class ResponseWatcher {
     }
 
     const { result, diags } = classifyReply(reply, {
-      item: d.item,
-      hasContinueButton: () => !!chat.findContinueBtn(),
-      knowsTool: this._d.knowsTool,
-      catalogueSize: this._d.catalogueSize(),
+      item: d.item, hasContinueButton: () => !!chat.findContinueBtn(),
+      knowsTool: this._d.knowsTool, catalogueSize: this._d.catalogueSize(), schemaOf: this._d.schemaOf,
     });
     for (const [event, data] of diags) this._diag(event, data);
     if (result.kind === "tool") this._diag("stopGoneToResp", s.latency("tool"));

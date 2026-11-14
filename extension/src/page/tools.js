@@ -114,20 +114,21 @@ export function createTools({ send, provider, state, settings, serverDirectory, 
     },
   };
 
-  /** The facts the messages are written around: the project, the target and the limit on one reply. */
+  /** The facts the messages are written around: the project, the target, the limit on one reply and the shape of a command. */
   const promptValues = () => buildPromptValues({
     workspace: workspaceInfo,
     targetName: serverDirectory.name(settings.target()),
     customPrompt: serverDirectory.customPrompt,
     skills: skills.enabled,
     calls: calls ? calls() : undefined,
+    callFormat: templates().format,
   });
 
   /** The standing instructions: the start template without the parts of a session. */
   const brief = () => buildBrief({ template: templates().start, values: promptValues() });
 
   /** The command list the model is reminded of every so often, scoped to the selected target, with the Commands per reply it may carry. */
-  const reminderText = () => toolsReminder(templates().reminder, catalogue.active(), serverDirectory.name(settings.target()), settings.target(), calls ? calls() : undefined);
+  const reminderText = () => toolsReminder(templates().reminder, catalogue.active(), serverDirectory.name(settings.target()), settings.target(), calls ? calls() : undefined, templates().format);
 
   return { bridge, session, catalogue, confirm, runner, manual, skills, workspace, promptValues, brief, reminderText, templates };
 }

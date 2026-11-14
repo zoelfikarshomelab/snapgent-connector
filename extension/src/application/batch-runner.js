@@ -11,6 +11,7 @@
 
 import { runningLabel } from "../domain/tools/result-summary.js";
 import { clampDelaySeconds, delayLabel, randomDelaySeconds } from "../domain/tools/delay.js";
+import { shapeOf } from "../domain/tools/call-format.js";
 import { jobKey } from "../domain/tools/job-key.js";
 import { DEFAULT_BATCH_CALLS, MAX_RESULT_PARTS, MIN_CALL_CHARS, callShare, composeBatch, sessionIsLarge, trimMiddle } from "../domain/prompt/budget.js";
 import { partMessages } from "../domain/prompt/parts.js";
@@ -111,7 +112,7 @@ export class BatchRunner {
     const messages = asFile ? [composed] : this._d.parts ? partMessages(composed, messageRoom, MAX_RESULT_PARTS) : [composed.length > room ? trimMiddle(composed, room, "the results") : composed];
     // Calls the model wrote in its own markup were run anyway; it is told, in the same message, to use our commands next time.
     if (batch.some((call) => call.native)) {
-      messages[messages.length - 1] += FEEDBACK.nativeFormat;
+      messages[messages.length - 1] += FEEDBACK.nativeFormat(this._shape());
       this._diag("tools.nativeNote", { format: batch.find((call) => call.native).native });
     }
     if (hint) {
@@ -159,6 +160,18 @@ export class BatchRunner {
     const isErr = answer.isError;
     this._diag("tool.done", { name: call.tool, isErr, chars: feedback.length, firstLine: feedback.split("\n", 2).join(" | ").slice(0, 90) });
     return { feedback, isErr };
+  }
+
+  /** The user's own wording for the messages the AI reads. */
+  _templates() {
+    const tools = this._d.tools;
+    const templates = tools && typeof tools.templates === "function" ? tools.templates() : null;
+    return templates && typeof templates === "object" ? templates : {};
+  }
+
+  /** How the shape of a command is called in the notes the model reads: the format the user set. */
+  _shape() {
+    return shapeOf(this._templates().format);
   }
 
   /** The pause after every command, in seconds (the user's own setting). */

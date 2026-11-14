@@ -59,6 +59,7 @@ export function createChat({ document, provider, state, visibility, catalogue, d
     timings: provider.timings,
     knowsTool: (name) => catalogue.knows(name),
     catalogueSize: () => catalogue.names().size,
+    schemaOf: (name) => catalogue.schemaOf(name),
     describeLayout,
     diag,
     phase: (name) => progress(PHASE_LABELS[name]),

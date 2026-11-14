@@ -3,18 +3,20 @@
 // as it should be written. The wording is the user's (see domain/prompt/templates.js). Pure.
 
 import { renderTemplate } from "../prompt/templates.js";
-import { callJson, commandLine } from "./command-line.js";
+import { renderCall } from "./call-format.js";
+import { commandLine } from "./command-line.js";
 import { bareToolName } from "./names.js";
 
 /**
  * @param {{ tool: string, arguments?: object }} call the call the model wrote
  * @param {{ body: string, isError?: boolean }} outcome what came back
- * @param {{ result?: string, error?: string }} templates the user's wording
+ * @param {{ result?: string, error?: string, format?: string }} templates the user's wording
  * @returns {string} the message the model reads
  */
 export function commandMessage(call, outcome, templates = {}) {
   const command = commandLine(call.tool, call.arguments);
-  const example = callJson(call.tool, call.arguments);
+  // The example of a command that failed is written in the shape the model was taught to use.
+  const example = renderCall(call.tool, call.arguments, templates.format);
   const values = { command, name: bareToolName(call.tool), output: outcome.body, error: outcome.body, example };
   const template = outcome.isError ? templates.error : templates.result;
   let text = template ? renderTemplate(template, values) : outcome.body;

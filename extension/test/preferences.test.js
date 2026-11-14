@@ -4,6 +4,7 @@ import { JSDOM } from "jsdom";
 import { DEFAULT_CONTEXT_FILES, clampContextFiles } from "../src/domain/prompt/context-file.js";
 import { DEFAULT_EXCLUDED_FOLDERS, clampExcludedFolders, parseFolderNames } from "../src/domain/prompt/excluded-folders.js";
 import { DEFAULT_TEMPLATES, TEMPLATE_NAMES } from "../src/domain/prompt/templates.js";
+import { BLOCK_SPEC } from "../src/domain/tools/call-format.js";
 import { MAX_DELAY_SECONDS } from "../src/domain/tools/delay.js";
 import { createPreferences, KEYS } from "../src/page/preferences.js";
 import { openPreferences } from "../src/ui/preferences-popup.js";
@@ -323,6 +324,22 @@ describe("preferences panel", () => {
     assert.equal($("#zs-pref-delay").value, "0");
     assert.equal($("#zs-pref-random-delay").value, "0");
     assert.deepEqual(saved.slice(2), [["delay", 0], ["random", 0]]);
+  });
+
+  test("the command format is a template of its own, with the two shapes ready to put in it", () => {
+    const w = new JSDOM("<!doctype html><body></body>").window;
+    const saved = [];
+    openPreferences({
+      document: w.document, values: { chars: 100000, calls: 8, folders: [], templates: DEFAULT_TEMPLATES }, defaults: { folders: [] },
+      save: { chars() {}, calls() {}, folders() {}, templates: (all) => saved.push(all) },
+    });
+    const $ = (selector) => w.document.querySelector(selector);
+    assert.equal($("#zs-pref-tpl-format").value, DEFAULT_TEMPLATES.format, "the box starts at the JSON shape");
+    $("#zs-pref-format-block").click();
+    assert.equal($("#zs-pref-tpl-format").value, BLOCK_SPEC, "the command block is one click away");
+    assert.equal(saved[0].format, BLOCK_SPEC, "and it is saved");
+    $("#zs-pref-reset").click();
+    assert.equal($("#zs-pref-tpl-format").value, DEFAULT_TEMPLATES.format, "the defaults bring the JSON shape back");
   });
 
   test("calibration actions are offered and wired, and there is no section for the bar", () => {

@@ -86,6 +86,8 @@ Commands per reply means that per AI answer, if it needs to use all MCP tools, t
 
 Delay per command: a pause after every command that runs, before the next one starts. Random delay after the commands: a random pause of up to that many seconds after all the commands of one answer have run, before the results go back to the AI. Both are off by default. While the agent waits, the text box says `delay 10`, counting down; while a command runs it says `Running command 1/3 · run_command · sleep 10` (the pause that follows). Stop ends the wait at once.
 
+Command format: how the AI writes a command. It is a template of its own, and the start message, the reminder and the example of a command that failed all repeat it. Two shapes are ready to put in it: the JSON one the extension has always read, and the command block (a fenced block of `key: value` lines, where a file's content goes in as it is, without any escaping). The extension reads both, whatever the AI is taught.
+
 Output as file: when active, if the prompt produced by MCP exceeds Message size it is sent as an attached .txt file. (providers that can receive files include Deepseek, ChatGPT - it hits the file upload limit too quickly, Claude, Meta AI, z.ai, Kimi, and Grok)
 
 Only for this site: when active the settings are saved for that provider site; when not active they are saved for all sites.

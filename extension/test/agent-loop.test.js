@@ -71,8 +71,8 @@ describe("AgentLoop: a command round-trip", () => {
     assert.deepEqual(h.events("run"), [["run", "a"], ["run", "b"]]);
     const text = h.state.submitted[0].text;
     assert.ok(text.startsWith("» a\nok\n\n» b\nok"));
-    assert.ok(text.endsWith(FEEDBACK.nativeFormat), "the note is the last thing in the message");
-    assert.doesNotMatch(FEEDBACK.nativeFormat, /DSML/i, "the note describes the markup and never quotes it");
+    assert.ok(text.endsWith(FEEDBACK.nativeFormat()), "the note is the last thing in the message");
+    assert.doesNotMatch(FEEDBACK.nativeFormat(), /DSML/i, "the note describes the markup and never quotes it");
   });
 
   test("a parse error asks the model to rewrite", async () => {
