@@ -76,3 +76,9 @@ export function renderCall(name, args, templateText) {
   if (formatOf(templateText) === "block") return renderBlock(name, args);
   return callJson(name, args);
 }
+
+/** A short example of the format in use, for the hints the user reads. */
+export function sampleCall(templateText) {
+  if (formatOf(templateText) === "block") return "name: git_status";
+  return '{"command":"git_status","params":{}}';
+}

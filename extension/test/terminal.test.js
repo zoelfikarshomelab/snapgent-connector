@@ -45,6 +45,50 @@ describe("ansi.feed", () => {
   });
 });
 
+describe("a command typed into the terminal", () => {
+  const flush = () => new Promise((resolve) => setImmediate(resolve));
+
+  function setup() {
+    const { window } = new JSDOM("<!doctype html><body></body>");
+    const ran = [];
+    const t = createTerminal({ document: window.document, diag: () => {} });
+    t.setRunner(async (call) => { ran.push(call); return { text: "ok", body: "ok", isError: false }; });
+    return { window, t, ran, $: (s) => window.document.querySelector(s) };
+  }
+
+  test("a command copied from the chat runs, in the command block", async () => {
+    const page = setup();
+    // Exactly what the copy gives: the block's text, without a fence and without a newline at the end.
+    page.$(".zs-t-input").value = "name: run_command\ncommand: sleep 5";
+    page.$(".zs-t-run").click();
+    await flush();
+    assert.deepEqual(page.ran, [{ tool: "run_command", arguments: { command: "sleep 5" } }]);
+  });
+
+  test("a command in the JSON shape runs as well", async () => {
+    const page = setup();
+    page.$(".zs-t-input").value = '{"command":"run_command","params":{"command":"sleep 5"}}';
+    page.$(".zs-t-run").click();
+    await flush();
+    assert.deepEqual(page.ran, [{ tool: "run_command", arguments: { command: "sleep 5" } }]);
+  });
+
+  test("text that is no command is refused, and the hint says how to write one", () => {
+    const page = setup();
+    page.$(".zs-t-input").value = "just some words";
+    page.$(".zs-t-run").click();
+    assert.equal(page.ran.length, 0);
+    assert.match(page.$(".zs-t-hint").textContent, /No command found/);
+  });
+
+  test("the empty box shows the shape in use", () => {
+    const page = setup();
+    assert.equal(page.$(".zs-t-input").placeholder, '{"command":"git_status","params":{}}');
+    page.t.setCallFormat(() => "```command\nname: git_status\n```");
+    assert.equal(page.$(".zs-t-input").placeholder, "name: git_status");
+  });
+});
+
 describe("the terminal panel store", () => {
   function setup() {
     const { window } = new JSDOM("<!doctype html><body></body>");

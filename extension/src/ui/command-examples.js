@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// "Command examples" popup, opened from the terminal: one card per available command with a JSON call to copy, or to put in the
+// "Command examples" popup, opened from the terminal: one card per available command with a call to copy, or to put in the
 // terminal's input. Text goes in with textContent only; the examples come ready-made from domain/tools/example-call.js.
 
 import { setHtml } from "./html.js";
@@ -27,18 +27,18 @@ function card(doc, example, { copy, use }) {
   useButton.title = "Put it in the terminal's input";
   copyButton.addEventListener("click", async () => {
     let ok = false;
-    try { ok = !!(await copy(example.json)); } catch { ok = false; }
+    try { ok = !!(await copy(example.call)); } catch { ok = false; }
     copyButton.textContent = ok ? "Copied ✓" : "Copy failed";
     setTimeout(() => { copyButton.textContent = "Copy"; }, 1500);
   });
-  useButton.addEventListener("click", () => use(example.json));
+  useButton.addEventListener("click", () => use(example.call));
   foot.append(copyButton, useButton);
-  box.append(head, make(doc, "pre", "zs-ex-json", example.json), foot);
+  box.append(head, make(doc, "pre", "zs-ex-json", example.call), foot);
   return box;
 }
 
 /**
- * @param {{ document: Document, examples: Array<{name: string, description: string, json: string, optional: string[]}>,
+ * @param {{ document: Document, examples: Array<{name: string, description: string, call: string, optional: string[]}>,
  *           copy: (text: string) => Promise<boolean>, onUse: (text: string) => void }} deps
  */
 export function openCommandExamples({ document, examples, copy, onUse }) {

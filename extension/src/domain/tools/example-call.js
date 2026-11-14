@@ -1,8 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Turns an MCP tool descriptor into an example call the user can copy: the JSON the terminal and the model both write, with the
+// Turns an MCP tool descriptor into an example call the user can copy: the call the extension reads, with the
 // required parameters filled by placeholders. Pure: a descriptor in, text out.
+//
+// The call is written in the shape the AI is taught (the user's call-format template): the JSON envelope, or the command
+// block. The extension reads both, so either runs.
 
 import { bareToolName } from "./names.js";
+import { renderCall } from "./call-format.js";
 
 // Placeholders by parameter name; anything else gets a value that fits its type.
 const TEXT = {
@@ -28,10 +32,11 @@ function sample(name, schema) {
 
 /**
  * @param {{ name: string, description?: string, inputSchema?: object }} tool
- * @returns {{ name: string, description: string, json: string, optional: string[] }}
- *   `json` carries the required parameters only; `optional` names the others, so the example stays short.
+ * @param {string} [format] the user's call-format template: the shape the call is written in
+ * @returns {{ name: string, description: string, call: string, optional: string[] }}
+ *   `call` carries the required parameters only; `optional` names the others, so the example stays short.
  */
-export function exampleCall(tool) {
+export function exampleCall(tool, format = "") {
   const props = (tool.inputSchema && tool.inputSchema.properties) || {};
   const required = new Set((tool.inputSchema && tool.inputSchema.required) || []);
   const params = {};
@@ -40,7 +45,7 @@ export function exampleCall(tool) {
   return {
     name,
     description: String(tool.description || "").split("\n")[0],
-    json: JSON.stringify({ command: name, params }),
+    call: renderCall(name, params, format),
     optional: Object.keys(props).filter((key) => !required.has(key)),
   };
 }

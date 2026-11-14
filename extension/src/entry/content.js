@@ -79,6 +79,8 @@ const tools = createTools({ send, provider, state, settings, serverDirectory, vi
 terminal.setCancel((jobKey, name) => tools.runner.cancelJob(jobKey, name));
 terminal.setRunner((call, options) => tools.manual.run(call, options));
 terminal.setTools(() => tools.catalogue.active());
+// The terminal takes the shape the AI writes its commands in, so a command copied from the chat runs as it is.
+terminal.setCallFormat(() => preferences.templates().format);
 const bridgeStatus = createBridgeStatus({ state, settings, tools, send, bar: () => bar, diag });
 let stop;
 let session;

@@ -120,6 +120,11 @@ export function createTerminalPanel({ document, onStop = () => {}, onCopy = () =
     inputEl.focus();
   }
 
+  /** The shape of a command the input expects, as the hint in the empty box. */
+  function setPlaceholder(text) {
+    inputEl.placeholder = text || "";
+  }
+
   function open() { panel.hidden = false; }
   function close() { panel.hidden = true; }
   function toggle() { panel.hidden ? open() : close(); }
@@ -195,5 +200,5 @@ export function createTerminalPanel({ document, onStop = () => {}, onCopy = () =
     if (nearBottom) el.scrollTop = el.scrollHeight;
   }
 
-  return { root: panel, open, close, toggle, isOpen, setTabs, appendLine, select, forget, flashCopy, setInput };
+  return { root: panel, open, close, toggle, isOpen, setTabs, appendLine, select, forget, flashCopy, setInput, setPlaceholder };
 }

@@ -9,6 +9,8 @@
 import { createTerminalPanel } from "../ui/terminal-panel.js";
 import { openCommandExamples } from "../ui/command-examples.js";
 import { exampleCall } from "../domain/tools/example-call.js";
+import { sampleCall } from "../domain/tools/call-format.js";
+import { bareToolName } from "../domain/tools/names.js";
 import { feed, state as freshState } from "../ui/ansi.js";
 import { parseToolCalls } from "../domain/parser/index.js";
 import { jobKey } from "../domain/tools/job-key.js";
@@ -53,6 +55,7 @@ export function createTerminal({ document, diag, onChange = () => {}, copy = (te
   let cancel = null;
   let runner = null;
   let toolList = () => [];
+  let callFormat = null;
 
   function running() {
     return [...tabs.values()].filter((tab) => tab.status === "running");
@@ -133,9 +136,25 @@ export function createTerminal({ document, diag, onChange = () => {}, copy = (te
   function setRunner(run) { runner = run; }
   /** `list` gives the commands the selected server offers right now. */
   function setTools(list) { toolList = list; }
+  /** `get` gives the user's call-format template: the shape the AI writes its commands in. */
+  function setCallFormat(get) {
+    callFormat = get;
+    panel.setPlaceholder(sampleCall(get ? get() : ""));
+  }
+
+  /** The shape of a command in use: the one the AI is taught, or the JSON one. */
+  function format() { return callFormat ? callFormat() : ""; }
+
+  /** The parameter types of a command, as the server advertises them. */
+  function schemaOf(name) {
+    const tool = toolList().find((item) => bareToolName(item.name) === bareToolName(name));
+    if (!tool || !tool.inputSchema) return null;
+    return tool.inputSchema.properties || null;
+  }
 
   function showExamples() {
-    openCommandExamples({ document, examples: toolList().map(exampleCall), copy, onUse: (text) => panel.setInput(text) });
+    const shape = format();
+    openCommandExamples({ document, examples: toolList().map((tool) => exampleCall(tool, shape)), copy, onUse: (text) => panel.setInput(text) });
   }
 
   function stop(key) {
@@ -160,8 +179,9 @@ export function createTerminal({ document, diag, onChange = () => {}, copy = (te
   /** Text typed into the panel: the commands in it run one after the other, each under its own tab. */
   function submit(text) {
     if (!runner) return { ok: false, error: "Commands cannot be run from here yet." };
-    const calls = parseToolCalls(text);
-    if (!calls.length) return { ok: false, error: 'No command found. Write it like {"command":"git_status","params":{}}' };
+    // The text is the user's own and whole: a command pasted from the chat runs as it is, in either shape.
+    const calls = parseToolCalls(text, { complete: true, schemaOf });
+    if (!calls.length) return { ok: false, error: `No command found. Write it like ${sampleCall(format())}` };
     if (calls.length > MAX_MANUAL_CALLS) return { ok: false, error: `At most ${MAX_MANUAL_CALLS} commands at once.` };
     runManual(calls).catch((error) => diag("term.manualFailed", { error: String((error && error.message) || error) }));
     return { ok: true };
@@ -195,5 +215,5 @@ export function createTerminal({ document, diag, onChange = () => {}, copy = (te
     draw();
   }
 
-  return { toggle, begin, ingest, finish, setCancel, setRunner, setTools, stop, runningCount, start };
+  return { toggle, begin, ingest, finish, setCancel, setRunner, setTools, setCallFormat, stop, runningCount, start };
 }

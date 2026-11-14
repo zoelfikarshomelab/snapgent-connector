@@ -30,7 +30,10 @@ export function classifyReply(reply, { item, hasContinueButton, knowsTool, catal
   const parseError = (reason) => done({ kind: "parse_error", reason, raw: reply, item });
 
   if (hasToolSignature(reply)) {
-    const calls = parseToolCalls(reply, { schemaOf });
+    // A bare block (a code block whose fence the site dropped) is only a command when it names one the server offers.
+    // With no catalogue to check against, any name counts: the runner then says which command it does not know.
+    const known = catalogueSize > 0 ? knowsTool : () => true;
+    const calls = parseToolCalls(reply, { schemaOf, knowsTool: known });
     if (calls.length) return done({ kind: "tool", calls, item });
     // A half-written command plus the site's Continue button means it was truncated: resume, don't report bad JSON.
     if (hasContinueButton()) return done({ kind: "truncated", text: reply, item });

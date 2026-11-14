@@ -184,6 +184,47 @@ It runs here in {{project}}.
   });
 });
 
+describe("the command block a site leaves behind", () => {
+  // A site renders the model's code block and keeps its text, not the fence around it: the reply the extension reads has no
+  // ```command in it at all.
+  const domText = ["Saya akan menjalankan perintah itu.", "", "name: run_command", "command: sleep 5", "", "Selesai."].join("\n");
+
+  test("a reply whose code block lost its fence is still a command", () => {
+    const calls = parseToolCalls(domText, { schemaOf, knowsTool: (name) => name === "run_command" });
+    assert.deepEqual(calls, [{ tool: "run_command", arguments: { command: "sleep 5" } }]);
+    assert.equal(hasToolSignature(domText), true);
+    assert.equal(hasOpenToolBlock(domText), false);
+  });
+
+  test("the same reply is read as a command by the classifier", () => {
+    const result = classifyReply(domText, { item: {}, hasContinueButton: () => false, knowsTool: (name) => name === "run_command", catalogueSize: 1, schemaOf });
+    assert.equal(result.result.kind, "tool");
+    assert.deepEqual(result.result.calls, [{ tool: "run_command", arguments: { command: "sleep 5" } }]);
+  });
+
+  test("a block that was cut off is not read, and the reply asks for a rewrite", () => {
+    const cut = "name: run_command\ncommand: sle";
+    assert.deepEqual(parseToolCalls(cut, { schemaOf }), []);
+    assert.equal(hasOpenToolBlock(cut), true, "it is still being written");
+    const result = classifyReply(cut, { item: {}, hasContinueButton: () => false, knowsTool: () => true, catalogueSize: 1, schemaOf });
+    assert.equal(result.result.kind, "parse_error");
+    assert.equal(result.result.reason, "unclosed");
+  });
+
+  test("prose that merely starts with name: is not a command", () => {
+    const prose = "name: my-service\nimage: nginx\n";
+    assert.deepEqual(parseToolCalls(prose, { schemaOf, knowsTool: () => false }), [], "the server offers no such command");
+    assert.deepEqual(parseToolCalls(prose, { schemaOf }), [{ tool: "my-service", arguments: { image: "nginx" } }], "without a catalogue to check against, any name counts");
+  });
+
+  test("a bare block with a raw value keeps it as it is", () => {
+    // The text of a code block, as the page hands it over: the block ends the reply and the page ends it with a line break.
+    const reply = ["name: edit_file", "path: src/a.js", "old_text: |", '    const x = "hello";', ""].join("\n");
+    const [call] = parseToolCalls(reply, { schemaOf, knowsTool: () => true });
+    assert.equal(call.arguments.old_text, 'const x = "hello";');
+  });
+});
+
 describe("the reply classifier", () => {
   const ctx = { item: {}, hasContinueButton: () => false, knowsTool: () => true, catalogueSize: 3, schemaOf };
 
