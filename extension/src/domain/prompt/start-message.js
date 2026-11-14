@@ -3,7 +3,7 @@
 // one command at a time (which commands exist, what the project looks like) is in it, so the model's whole part of the start is
 // one short answer. The wording is the user's (see domain/prompt/templates.js). Pure.
 
-import { renderTemplate } from "./templates.js";
+import { ensureCallFormat, renderTemplate } from "./templates.js";
 
 /**
  * @param {{ template: string, values?: Record<string, string> }} parts
@@ -11,7 +11,7 @@ import { renderTemplate } from "./templates.js";
  *   list, the project tree, the instruction file). A part that is empty is left out of the message.
  */
 export function buildStartMessage({ template, values = {} }) {
-  return renderTemplate(template, values);
+  return renderTemplate(ensureCallFormat(template), values);
 }
 
 /**
@@ -19,5 +19,5 @@ export function buildStartMessage({ template, values = {} }) {
  * what is repeated to a model that forgot how we work, in the middle of a long conversation.
  */
 export function buildBrief({ template, values = {} }) {
-  return renderTemplate(template, { ...values, commands: "", tree: "", instructions: "", instructions_file: "", ask: "" });
+  return renderTemplate(ensureCallFormat(template), { ...values, commands: "", tree: "", instructions: "", instructions_file: "", ask: "" });
 }

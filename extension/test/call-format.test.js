@@ -4,7 +4,7 @@ import { classifyReply } from "../src/domain/agent/reply-classifier.js";
 import { parseToolCalls } from "../src/domain/parser/tool-call.js";
 import { hasOpenToolBlock, hasToolSignature, toolNameFromText } from "../src/domain/parser/detect.js";
 import { FEEDBACK } from "../src/domain/prompt/feedback.js";
-import { DEFAULT_TEMPLATES, TEMPLATE_NAMES, clampTemplates, renderTemplate } from "../src/domain/prompt/templates.js";
+import { DEFAULT_TEMPLATES, TEMPLATE_NAMES, clampTemplates, ensureCallFormat, renderTemplate } from "../src/domain/prompt/templates.js";
 import { buildPromptValues } from "../src/domain/prompt/system-prompt.js";
 import { toolsReminder } from "../src/domain/prompt/reminder.js";
 import { commandMessage } from "../src/domain/tools/command-message.js";
@@ -141,6 +141,46 @@ describe("every message about a command says the same shape", () => {
     // Quotes need no escaping; only text that holds a line break goes on its own lines.
     assert.equal(renderBlock("edit_file", { path: "a.js", old_text: 'x = "1"' }), '```command\nname: edit_file\npath: a.js\nold_text: x = "1"\n```');
     assert.equal(renderBlock("edit_file", { path: "a.js", old_text: "one\ntwo" }), '```command\nname: edit_file\npath: a.js\nold_text: |\n    one\n    two\n```');
+  });
+});
+
+describe("the shape of a command is in the message even when the template never asked for it", () => {
+  test("a template from before the shape was a template still teaches the shape in use", () => {
+    // The paragraph the extension used to write, as it stands in a template the user saved before this change.
+    const oldStart = `Hi. {{project}} is your current workspace.
+
+${JSON_SPEC}
+
+It runs here in {{project}}.
+
+{{ask}}`;
+    const values = buildPromptValues({ callFormat: BLOCK_SPEC });
+    const start = renderTemplate(ensureCallFormat(oldStart), { ...values, commands: "c", ask: "ask" });
+    assert.ok(start.includes(BLOCK_SPEC), "the shape in use is taught");
+    assert.ok(!start.includes(JSON_SPEC), "and the old JSON paragraph is gone, not next to it");
+  });
+
+  test("a template that never mentioned the shape gets it before the closing question", () => {
+    const custom = `Hi. {{project}} is your current workspace.
+
+{{commands}}
+
+{{ask}}`;
+    const values = buildPromptValues({ callFormat: BLOCK_SPEC });
+    const start = renderTemplate(ensureCallFormat(custom), { ...values, commands: "c", ask: "ask me" });
+    assert.ok(start.includes(BLOCK_SPEC));
+    assert.ok(start.indexOf(BLOCK_SPEC) < start.indexOf("ask me"), "the closing question stays last");
+  });
+
+  test("a template that asks for the shape itself is left alone", () => {
+    const custom = "Hi.\n\n{{call_format}}\n\n{{ask}}";
+    assert.equal(ensureCallFormat(custom), custom);
+  });
+
+  test("the reminder carries the shape too, whatever its template says", () => {
+    const oldReminder = "A quick reminder: these are the commands you can use.\n\n{{commands}}\n\nYou may write {{calls}} in one reply.";
+    const reminder = toolsReminder(oldReminder, [], "VS Code", "snapgent", 5, BLOCK_SPEC);
+    assert.ok(reminder.includes(BLOCK_SPEC), "the shape in use is repeated");
   });
 });
 

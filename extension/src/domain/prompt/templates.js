@@ -9,6 +9,9 @@
 
 import { JSON_SPEC } from "../tools/call-format.js";
 
+/** The placeholder the shape of a command is written at. */
+export const CALL_FORMAT_PLACEHOLDER = "{{call_format}}";
+
 /** The templates there are, in the order the preferences panel shows them. */
 export const TEMPLATE_NAMES = ["start", "reminder", "result", "error", "resend", "format"];
 
@@ -98,6 +101,27 @@ Here is how that command should be written, so that it runs:
 };
 
 const PLACEHOLDER = /\{\{\s*([a-z_]+)\s*\}\}/g;
+
+/**
+ * The template with the shape of a command in it, whatever the user wrote.
+ *
+ * A template the extension shipped before the shape became a template of its own still carries the paragraph that taught the
+ * JSON shape; that paragraph is replaced by the shape in use, so the two never stand next to each other. A template that
+ * never mentioned the shape at all gets it before the closing question: without it the model writes commands the extension
+ * does not read.
+ *
+ * @param {string} template
+ * @returns {string}
+ */
+export function ensureCallFormat(template) {
+  const text = String(template || "");
+  if (text.includes(CALL_FORMAT_PLACEHOLDER)) return text;
+  if (text.includes(JSON_SPEC)) return text.replace(JSON_SPEC, CALL_FORMAT_PLACEHOLDER);
+  const blocks = text.split(/\n\s*\n/);
+  const at = blocks.findIndex((block) => block.includes("{{ask}}"));
+  if (at === -1) return [...blocks, CALL_FORMAT_PLACEHOLDER].join("\n\n");
+  return [...blocks.slice(0, at), CALL_FORMAT_PLACEHOLDER, ...blocks.slice(at)].join("\n\n");
+}
 
 /**
  * Fill the placeholders of a template.

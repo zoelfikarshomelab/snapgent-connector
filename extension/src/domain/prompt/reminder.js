@@ -3,7 +3,7 @@
 import { DEFAULT_SERVER_ID } from "../tools/default-server.js";
 import { specOf } from "../tools/call-format.js";
 import { batchPhrase } from "./system-prompt.js";
-import { renderTemplate } from "./templates.js";
+import { ensureCallFormat, renderTemplate } from "./templates.js";
 
 export function compactTools(tools) {
   return (tools || [])
@@ -25,5 +25,5 @@ export function toolsReminder(template, tools, targetName = "Snapgent MCP", serv
   const commands =
     `  list_commands(server: "${serverId}") - list available ${targetName} commands with full parameter details\n` +
     compactTools(tools);
-  return renderTemplate(template, { commands, target: targetName, calls: batchPhrase(calls), call_format: specOf(callFormat) });
+  return renderTemplate(ensureCallFormat(template), { commands, target: targetName, calls: batchPhrase(calls), call_format: specOf(callFormat) });
 }
