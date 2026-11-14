@@ -1,5 +1,6 @@
 """The command line as the model wrote it: "npm test" means the program npm with the argument test."""
 
+import os
 import unittest
 
 from snapgent_mcp.command_line import command_parts, normalize_arguments, split_command_line
@@ -10,8 +11,12 @@ from snapgent_mcp.security.commands import escalates_privileges, is_harmless
 class CommandLineTests(unittest.TestCase):
     def test_a_command_line_in_one_piece_is_split(self):
         self.assertEqual(split_command_line("npm test"), ["npm", "test"])
-        self.assertEqual(split_command_line("git commit -m 'a message'"), ["git", "commit", "-m", "a message"])
         self.assertEqual(split_command_line("  sleep 5  "), ["sleep", "5"])
+
+    def test_a_quoted_argument_is_one_word(self):
+        # POSIX reads the quotes and hands over the word they held; Windows keeps them, because cmd.exe does the quoting there.
+        quoted = "a message" if os.name != "nt" else "'a message'"
+        self.assertEqual(split_command_line("git commit -m 'a message'"), ["git", "commit", "-m", quoted])
 
     def test_a_program_of_its_own_is_left_alone(self):
         self.assertEqual(command_parts("npm", ["test"]), ["npm", "test"])

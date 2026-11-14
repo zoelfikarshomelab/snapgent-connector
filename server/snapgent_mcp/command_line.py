@@ -18,12 +18,11 @@ def split_command_line(command: str) -> List[str]:
     if not text:
         return [text]
     try:
+        # POSIX reads the quotes and hands over the word they held. Windows keeps them: cmd.exe does the quoting, and the safety
+        # check looks at them, so they have to stay as they are.
         parts = shlex.split(text, posix=(os.name != "nt"))
     except ValueError:  # an unbalanced quote: run it as it is, and let it fail as it is
         return [text]
-    if os.name == "nt":
-        # Windows keeps the quotes around a word; they are not part of the program.
-        parts = [part.strip('"') for part in parts]
     return [part for part in parts if part] or [text]
 
 
